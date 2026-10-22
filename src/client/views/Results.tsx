@@ -28,6 +28,7 @@ import { isCategory } from '@/data/categories';
 import { checks, isCheck } from '@/data/checks';
 import { jobsFor, cardsFor } from 'client/jobs/registry';
 import { runAnalysis } from 'client/analysis/registry';
+import CormorantSection from 'client/components/Results/CormorantSection';
 
 const ResultsOuter = styled.div`
   display: flex;
@@ -187,6 +188,7 @@ const Results = (props: { address?: string }): JSX.Element => {
       {!errorKind && (
         <>
           <AdvisoryPanel findings={findings} onJumpTo={jumpToCard} />
+          <CormorantSection address={address} jobs={jobsState} />
           <ResultsContent>
             <ResultsMasonryGrid minColWidth={336}>
               {cardsToShow.map(({ card, data }) => (
