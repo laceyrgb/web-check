@@ -5,6 +5,7 @@
 <b><i>Comprehensive, on-demand open source intelligence for any website</i></b>
 <br />
 <b>🌐 <a href="https://web-check.xyz/">web-check.xyz</a></b><br />
+Cormorant OSINT Desk (passive recon, monitoring, and gated authorized scans) is documented in <a href="../docs/CORMORANT.md">docs/CORMORANT.md</a> and <a href="../docs/API.md">docs/API.md</a>.<br />
 
 </p>
 
