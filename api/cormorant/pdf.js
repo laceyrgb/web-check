@@ -1,4 +1,4 @@
-import { buildExecutiveSummary } from './risk.js';
+import { buildExecutiveSummary, prioritizeRemediations } from './risk.js';
 
 const loadPdf = async () => {
   const pdfkit = await import('pdfkit');
@@ -10,6 +10,34 @@ const section = (pdf, title, lines) => {
   pdf.fillColor('#1F6F6A').fontSize(13).text(title);
   pdf.fillColor('#1c1c1c').fontSize(10);
   for (const line of lines.filter(Boolean)) pdf.text(line, { width: 500 });
+};
+
+const drawTrend = (pdf, points) => {
+  const rows = (points || []).filter((point) => typeof point.riskScore === 'number');
+  section(
+    pdf,
+    'Risk score trend',
+    rows.length < 2
+      ? ['Fewer than two scored scans are on file, so no chart is drawn.']
+      : rows.map((point) => `${point.scannedAt}: ${point.riskScore}`),
+  );
+  if (rows.length < 2) return;
+  const left = 48;
+  const width = 500;
+  const height = 90;
+  const top = pdf.y + 8;
+  pdf.save();
+  pdf.lineWidth(1).strokeColor('#1F6F6A').rect(left, top, width, height).stroke();
+  rows.forEach((point, index) => {
+    const x = left + (width * index) / (rows.length - 1);
+    const y = top + height - (point.riskScore / 100) * height;
+    if (index === 0) pdf.moveTo(x, y);
+    else pdf.lineTo(x, y);
+  });
+  pdf.strokeColor('#0B1F33').lineWidth(2).stroke();
+  pdf.restore();
+  pdf.x = left;
+  pdf.y = top + height + 10;
 };
 
 export const renderReport = async (report) => {
@@ -29,6 +57,15 @@ export const renderReport = async (report) => {
     pdf.text(`Scan time: ${report.scannedAt || 'unknown'}`);
     if (report.id) pdf.text(`Scan id: ${report.id}`);
     section(pdf, 'Executive summary', report.executiveSummary || buildExecutiveSummary(report));
+    const remediations = report.remediations || prioritizeRemediations(report);
+    section(
+      pdf,
+      'Prioritized remediation',
+      remediations.length
+        ? remediations.map((item, index) => `${index + 1}. [${item.source}] ${item.action}`)
+        : ['No weighted findings produced a remediation.'],
+    );
+    drawTrend(pdf, report.trend);
     const surface = report.attackSurface;
     if (surface) {
       section(pdf, 'Attack surface', [

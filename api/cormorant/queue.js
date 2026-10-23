@@ -46,6 +46,7 @@ export const startScheduler = ({ store, enqueue }) => {
         email: monitor.email || null,
         publicUrls: monitor.publicUrls || [],
         monitorId: monitor.id,
+        tenant: monitor.tenant || 'default',
       });
       store.updateMonitor(monitor.id, { running: true, lastScanId: scan.id });
       enqueue(scan.id);

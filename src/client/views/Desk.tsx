@@ -175,6 +175,7 @@ const Desk = (): JSX.Element => {
         <Bulk onRun={run} call={call} />
         <Monitor onRun={run} call={call} target={target} />
       </section>
+      <History target={target} onRun={run} call={call} />
       <Nmap onRun={run} call={call} target={target} />
       <Engagement onRun={run} call={call} />
       <Audit onRun={run} call={call} />
@@ -243,6 +244,79 @@ const Monitor = ({
         List monitors
       </button>
     </label>
+  );
+};
+
+const History = ({
+  target,
+  onRun,
+  call,
+}: {
+  target: string;
+  onRun: (work: () => Promise<unknown>) => void;
+  call: (path: string, init?: RequestInit) => Promise<any>;
+}) => {
+  const [history, setHistory] = useState<any>(null);
+  const load = () =>
+    onRun(async () => {
+      const body = await call(`/history?target=${encodeURIComponent(target)}`);
+      setHistory(body);
+      return body;
+    });
+  const trend = Array.isArray(history?.trend) ? history.trend : [];
+  const max = 100;
+  return (
+    <section>
+      <h2>Target history</h2>
+      <p>
+        Read-only. Lists this tenant's scans, the risk score over time, and the latest findings.
+      </p>
+      <button type="button" onClick={load}>
+        Load history
+      </button>
+      {history && (
+        <>
+          <div
+            style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginTop: 12 }}
+          >
+            {trend.length === 0 && <span>No scored scans yet.</span>}
+            {trend.map(
+              (point: { scannedAt?: string; riskScore?: number | null }, index: number) => (
+                <div
+                  key={`${point.scannedAt}-${index}`}
+                  title={`${point.scannedAt || ''} ${point.riskScore ?? 'n/a'}`}
+                  style={{
+                    width: 18,
+                    height: `${Math.max(4, ((point.riskScore || 0) / max) * 80)}px`,
+                    background: 'var(--primary)',
+                  }}
+                />
+              ),
+            )}
+          </div>
+          <ul>
+            {(history.scans || []).map(
+              (scan: {
+                id: string;
+                status: string;
+                createdAt: string;
+                risk?: { score?: number; letter?: string };
+              }) => (
+                <li key={scan.id}>
+                  {scan.createdAt} · {scan.status}
+                  {scan.risk?.score != null
+                    ? ` · risk ${scan.risk.score} (${scan.risk.letter})`
+                    : ''}
+                </li>
+              ),
+            )}
+          </ul>
+          {history.latestFindings?.summary && (
+            <p>{(history.latestFindings.summary || []).join(' ')}</p>
+          )}
+        </>
+      )}
+    </section>
   );
 };
 

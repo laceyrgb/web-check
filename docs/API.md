@@ -6,13 +6,16 @@ Machine-readable index: `GET /api/v1/openapi.json`.
 
 ## Authentication
 
-When `WEBCHECK_API_KEY` is unset, routes are open for local use. When it is set, every route except `GET /api/v1` and `GET /api/v1/openapi.json` requires the same value in `x-api-key` or `Authorization: Bearer`.
+When neither `WEBCHECK_API_KEY` nor `WEBCHECK_TENANT_KEYS` is set, routes are open for local use and every record is stored on the `default` tenant. When either is set, every route except `GET /api/v1` and `GET /api/v1/openapi.json` requires `x-api-key` or `Authorization: Bearer`.
+
+`WEBCHECK_API_KEY` maps to tenant `default`. `WEBCHECK_TENANT_KEYS` is `tenant:key` pairs separated by commas. A tenant id is 1–41 characters, starting with a letter or digit, then letters, digits, or hyphens. The key may contain colons. A presented key is compared in constant time and selects that tenant for the request. List and get routes return only that tenant's scans, bulk jobs, monitors, timeline, assets, authorizations, Nmap jobs, engagements, and screenshots. Existing JSON written before this field existed is migrated to `default` on load.
 
 ## Environment
 
 | Variable | Effect when unset |
 | --- | --- |
-| `WEBCHECK_API_KEY` | API is open |
+| `WEBCHECK_API_KEY` | API is open unless `WEBCHECK_TENANT_KEYS` is set. This key is tenant `default` |
+| `WEBCHECK_TENANT_KEYS` | No extra tenants. Format `acme:secret,other:secret` |
 | `WEBCHECK_DATA_DIR` | Store files in `./.data` |
 | `WEBCHECK_SCAN_CONCURRENCY` | One scan at a time |
 | `WEBCHECK_DISABLE_SCHEDULER` | Monitor timer runs |
@@ -27,6 +30,12 @@ When `WEBCHECK_API_KEY` is unset, routes are open for local use. When it is set,
 | `WEBCHECK_NMAP_TIMEOUT_MS` | 180000 |
 | `WEBCHECK_PENTEST_ENABLED` | Engagement routes refuse |
 | `WEBCHECK_NUCLEI_MAX_SEVERITY` | Nuclei severity cap is `medium` |
+| `WEBCHECK_SLACK_WEBHOOK_URL` | Slack alerts are skipped. `SLACK_WEBHOOK_URL` is an alias |
+| `WEBCHECK_ALERT_EMAIL_TO` | Email alerts are skipped |
+| `WEBCHECK_SMTP_HOST` | Email alerts are skipped even if a recipient is set |
+| `WEBCHECK_SMTP_PORT` | 587, which uses STARTTLS. Port 465 is implicit TLS |
+| `WEBCHECK_SMTP_USER` / `WEBCHECK_SMTP_PASS` | SMTP AUTH is skipped |
+| `WEBCHECK_ALERT_EMAIL_FROM` | From address is `cormorant@localhost` |
 
 Shodan and Censys calls are read-only host lookups. Errors do not include the key. Missing keys are reported as skipped, not as findings.
 
@@ -40,7 +49,7 @@ curl -s -X POST localhost:3000/api/v1/scans \
 
 Response `202` with `{ "id", "status": "queued" }`. Poll `GET /api/v1/scans/:id` until `complete`, then `GET /api/v1/scans/:id/results`.
 
-`GET /api/v1/scans/:id/report.pdf` returns the Cormorant PDF. `GET /api/v1/report.pdf?url=example.com` runs a scan and returns the PDF. Optional `nmap=<job id>` attaches an authorized port-scan section only when that completed job is for the same host.
+`GET /api/v1/scans/:id/report.pdf` returns the Cormorant PDF. `GET /api/v1/report.pdf?url=example.com` runs a scan and returns the PDF. Optional `nmap=<job id>` attaches an authorized port-scan section only when that completed job is for the same host and the same tenant. The PDF includes the executive summary, a remediation list ordered by severity weight, and the risk-score trend for that tenant.
 
 Results include `risk` (`score`, `letter`, `factors`), `history.changes`, and `assets`. If no module returned data, `risk.score` is null and `risk.letter` is `n/a`.
 
@@ -62,9 +71,13 @@ curl -s -X POST localhost:3000/api/v1/monitors \
   -d '{"target":"example.com","everyMinutes":1440}'
 ```
 
-`everyMinutes` is 15 to 10080. `schedule` accepts `every:30m`, `every:12h`, or `every:1d`. Creating a monitor queues the first scan. Later runs are compared with the previous snapshot. Alert types: `new-subdomain`, `new-cert-name`, `new-cve`, `new-open-service`, `new-leak-mention`, `new-lookalike`, `dns-change`, `risk-worse`, `posture-worse`.
+`everyMinutes` is 15 to 10080. `schedule` accepts `every:30m`, `every:12h`, or `every:1d`. Creating a monitor queues the first scan. Later runs are compared with the previous snapshot for that tenant. Recorded diff types: `new-subdomain`, `new-cert-name`, `cert-change`, `new-cve`, `new-open-service`, `new-leak-mention`, `new-lookalike`, `dns-change`, `risk-worse`, `posture-worse`. The first snapshot is a baseline and has no diffs.
+
+Slack and email are sent only for `risk-worse`, `new-subdomain`, `new-cert-name`, and `cert-change`. The monitor stores `alert` and `alertDelivery`. When no sink is configured, `alertDelivery.skipped` is `unconfigured` and nothing is sent.
 
 `GET /api/v1/timeline?target=example.com` returns snapshots and those diffs.
+
+`GET /api/v1/history?target=example.com` is read-only. It returns `{ target, tenant, scans, trend, latestFindings }` for the caller's tenant. `scans` is the latest 30 jobs with status and risk. `trend` is `{ scannedAt, riskScore }`. `latestFindings` is the newest completed scan's risk, executive summary, and changes, or null.
 
 `GET /api/v1/assets?target=example.com` returns deduped hosts, IPs, services, technologies, and published emails with `firstSeen` and `lastSeen`.
 
@@ -117,13 +130,13 @@ curl -s -X POST localhost:3000/api/v1/engagements \
 
 `POST /api/v1/engagements/:id/simulation` returns a labeled training template with `{{SIMULATION_URL}}` and `{{RECIPIENT_ID}}`. It does not send mail and it has no form.
 
-`POST /api/v1/engagements/:id/spray` always returns `403` and `{ "code": "spray-refused" }`. Password spraying is not available.
+`POST /api/v1/engagements/:id/spray` always returns `403` and `{ "code": "spray-refused" }`. Storing `testUsername` and `testPassword` does not change that. Those two fields are used only for one in-scope login during crawl. Password spraying is not available.
 
 ## Other routes
 
 `POST /api/v1/people` with `{ "publicUrls": [] }` reads pages you supply. A login wall is reported as unavailable.
 
-`POST /api/v1/audit/sbom` accepts `{ "filename", "content" }` or `{ "repo": "https://github.com/org/name" }` and queries the public OSV API.
+`POST /api/v1/audit/sbom` accepts `{ "filename", "content" }` or `{ "repo": "https://github.com/org/name" }`. Supported files are `package.json`, `package-lock.json`, `yarn.lock`, `requirements.txt`, `go.mod`, `Gemfile.lock`, `Cargo.lock`, `composer.lock`, `pom.xml`, CycloneDX JSON, and SPDX JSON. A public GitHub URL is fetched from `raw.githubusercontent.com` at `HEAD` and tries those filenames in that order. Only exact versions are queried, at most 40. The JSON body is `{ findings, sbom, skipped, note }`. `sbom` is CycloneDX 1.5. Nothing is installed. A `githubToken` is taken from the request or from an engagement secret in the same tenant and is not returned.
 
 `POST /api/v1/audit/apk` accepts `{ "storeUrl" }` for play.google.com or apps.apple.com, or `{ "base64" }` under 8MB. The APK is not installed. Permissions, text-manifest exported components, and redacted secret previews are returned.
 

@@ -12,17 +12,33 @@ export const openapi = {
     '/api/v1/scans/{id}/results': { get: { summary: 'Fetch completed results' } },
     '/api/v1/scans/{id}/report.pdf': { get: { summary: 'Download the Cormorant PDF' } },
     '/api/v1/bulk': { post: { summary: 'Queue a list of domains' } },
-    '/api/v1/monitors': { get: { summary: 'List monitors' }, post: { summary: 'Create an interval monitor' } },
+    '/api/v1/monitors': {
+      get: { summary: 'List monitors' },
+      post: { summary: 'Create an interval monitor' },
+    },
     '/api/v1/timeline': { get: { summary: 'Scan snapshots and diffs for a target' } },
+    '/api/v1/history': {
+      get: { summary: 'Read-only per-target scan history, risk trend, and latest findings' },
+    },
     '/api/v1/assets': { get: { summary: 'Deduped asset inventory' } },
     '/api/v1/authorizations': { post: { summary: 'Record an authorized-target acknowledgement' } },
-    '/api/v1/nmap': { post: { summary: 'Queue an authorized Nmap profile. Never called by a plain scan.' } },
-    '/api/v1/engagements': { post: { summary: 'Open a pentest engagement. Requires WEBCHECK_PENTEST_ENABLED.' } },
+    '/api/v1/nmap': {
+      post: { summary: 'Queue an authorized Nmap profile. Never called by a plain scan.' },
+    },
+    '/api/v1/engagements': {
+      post: { summary: 'Open a pentest engagement. Requires WEBCHECK_PENTEST_ENABLED.' },
+    },
     '/api/v1/engagements/{id}/crawl': { post: { summary: 'In-scope authenticated crawl' } },
     '/api/v1/engagements/{id}/nuclei': { post: { summary: 'Safe Nuclei templates only' } },
-    '/api/v1/engagements/{id}/simulation': { post: { summary: 'Export a labeled training template. Does not send mail.' } },
-    '/api/v1/engagements/{id}/spray': { post: { summary: 'Always refused. Password spraying is not implemented.' } },
-    '/api/v1/audit/sbom': { post: { summary: 'Parse a lockfile or public GitHub repo and query OSV' } },
+    '/api/v1/engagements/{id}/simulation': {
+      post: { summary: 'Export a labeled training template. Does not send mail.' },
+    },
+    '/api/v1/engagements/{id}/spray': {
+      post: { summary: 'Always refused. Password spraying is not implemented.' },
+    },
+    '/api/v1/audit/sbom': {
+      post: { summary: 'Parse a lockfile or public GitHub repo and query OSV' },
+    },
     '/api/v1/audit/apk': { post: { summary: 'Static APK or public store URL review' } },
     '/api/v1/people': { post: { summary: 'Read public URLs the caller supplies' } },
     '/api/v1/screenshots': { post: { summary: 'Archive a public page if robots.txt allows it' } },

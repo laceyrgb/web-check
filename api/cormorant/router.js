@@ -3,11 +3,12 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import express from 'express';
-import { requireApiKey } from './auth.js';
+import { requireApiKey, tenantKeyMap } from './auth.js';
+import { deliverAlerts as defaultDeliverAlerts, selectAlerts } from './alerts.js';
 import { createFileStore } from './store.js';
 import { createQueue, startScheduler } from './queue.js';
 import { executeScan as defaultExecute } from './scan.js';
-import { summarizeScan, diffScans } from './risk.js';
+import { summarizeScan, diffScans, prioritizeRemediations } from './risk.js';
 import { updateInventory } from './inventory.js';
 import { blockedInfrastructure, canonicalHost, flagOn, httpError, robotsAllows } from './util.js';
 import { invoke } from './hosts.js';
@@ -22,7 +23,7 @@ import {
   simulationTemplate,
 } from './pentest.js';
 import { inspectApkBuffer, inspectStoreUrl } from './apk.js';
-import { parseLockfile, publicGithubLockfile, queryOsv } from './sbom.js';
+import { buildSbom, parseManifest, publicGithubLockfile, queryOsv } from './sbom.js';
 import { fetchPeople } from './content.js';
 import { httpGet } from '../_common/http.js';
 import { openapi } from './openapi.js';
@@ -68,7 +69,9 @@ export const createRouter = ({
   schedule = true,
   nmapRunner = exec,
   nucleiRunner = exec,
+  deliverAlerts = defaultDeliverAlerts,
 } = {}) => {
+  const tenantOf = (req) => req.tenant || 'default';
   const router = express.Router();
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -77,7 +80,8 @@ export const createRouter = ({
     if (!scan || scan.status === 'complete') return;
     store.updateScan(scanId, { status: 'running', startedAt: new Date().toISOString() });
     try {
-      const previous = store.latestSummary(scan.hostname);
+      const tenant = scan.tenant || 'default';
+      const previous = store.latestSummary(scan.hostname, tenant);
       const results = await executeScan(scan.target, {
         email: scan.email,
         publicUrls: scan.publicUrls,
@@ -85,10 +89,14 @@ export const createRouter = ({
       const summary = summarizeScan(results);
       const changes = diffScans(previous, summary);
       results.history = { baseline: !previous, changes };
-      const assets = updateInventory(store.getAssets(scan.hostname), results, results.scannedAt);
+      const assets = updateInventory(
+        store.getAssets(scan.hostname, tenant),
+        results,
+        results.scannedAt,
+      );
       results.assets = assets;
-      store.saveAssets(scan.hostname, assets);
-      store.rememberSummary(scan.hostname, summary);
+      store.saveAssets(scan.hostname, assets, tenant);
+      store.rememberSummary(scan.hostname, summary, tenant);
       store.updateScan(scanId, {
         status: 'complete',
         finishedAt: new Date().toISOString(),
@@ -98,13 +106,27 @@ export const createRouter = ({
       });
       if (scan.monitorId) {
         const monitor = store.getMonitor(scan.monitorId);
+        let alertDelivery = { delivered: [], skipped: 'no-alert' };
+        if (selectAlerts(changes).length) {
+          try {
+            alertDelivery = await deliverAlerts({
+              target: scan.target,
+              tenant,
+              changes,
+              risk: results.risk?.score ?? null,
+            });
+          } catch {
+            alertDelivery = { delivered: [], error: 'Alert delivery failed' };
+          }
+        }
         store.updateMonitor(scan.monitorId, {
           running: false,
           lastRunAt: new Date().toISOString(),
           nextRunAt: new Date(Date.now() + (monitor?.everyMinutes || 1440) * 60000).toISOString(),
           lastSummary: summary,
           changes,
-          alert: changes.length > 0,
+          alert: selectAlerts(changes).length > 0,
+          alertDelivery,
           lastScanId: scanId,
         });
       }
@@ -133,7 +155,7 @@ export const createRouter = ({
     if (!job) return;
     store.updateNmap(jobId, { status: 'running' });
     try {
-      const auth = store.getAuthorization(job.authorizationId);
+      const auth = store.getAuthorization(job.authorizationId, job.tenant);
       const resolved = await resolveSingleIp(auth.target);
       if (auth.target !== auth.ip && !resolved.addresses.includes(auth.ip)) {
         throw httpError(
@@ -205,7 +227,7 @@ export const createRouter = ({
   router.get('/', (req, res) => {
     res.json({
       name: 'Cormorant OSINT Desk API',
-      authRequired: Boolean(process.env.WEBCHECK_API_KEY),
+      authRequired: tenantKeyMap().length > 0,
       openapi: '/api/v1/openapi.json',
       nmapEnabled: flagOn('WEBCHECK_NMAP_ENABLED'),
       pentestEnabled: flagOn('WEBCHECK_PENTEST_ENABLED'),
@@ -220,6 +242,7 @@ export const createRouter = ({
       const scan = store.createScan({
         target: `https://${hostname}`,
         hostname,
+        tenant: tenantOf(req),
         email: req.body?.email || null,
         publicUrls: Array.isArray(req.body?.publicUrls) ? req.body.publicUrls.slice(0, 8) : [],
       });
@@ -229,15 +252,15 @@ export const createRouter = ({
   );
 
   router.get('/scans', (req, res) =>
-    res.json({ scans: store.listScans().slice(0, 50).map(publicScan) }),
+    res.json({ scans: store.listScans(tenantOf(req)).slice(0, 50).map(publicScan) }),
   );
   router.get('/scans/:id', (req, res) => {
-    const scan = store.getScan(req.params.id);
+    const scan = store.getScan(req.params.id, tenantOf(req));
     if (!scan) return res.status(404).json({ error: 'Scan not found' });
     return res.json(publicScan(scan));
   });
   router.get('/scans/:id/results', (req, res) => {
-    const scan = store.getScan(req.params.id);
+    const scan = store.getScan(req.params.id, tenantOf(req));
     if (!scan) return res.status(404).json({ error: 'Scan not found' });
     if (scan.status !== 'complete')
       return res.status(409).json({ error: 'Scan is not complete', status: scan.status });
@@ -245,7 +268,9 @@ export const createRouter = ({
   });
   router.get(
     '/scans/:id/report.pdf',
-    wrap(async (req, res) => sendPdf(res, store.getScan(req.params.id), req.query.nmap)),
+    wrap(async (req, res) =>
+      sendPdf(res, store.getScan(req.params.id, tenantOf(req)), req.query.nmap),
+    ),
   );
   router.get(
     '/report.pdf',
@@ -254,6 +279,7 @@ export const createRouter = ({
       const scan = store.createScan({
         target: `https://${hostname}`,
         hostname,
+        tenant: tenantOf(req),
         email: req.query.email || null,
         publicUrls: [],
       });
@@ -267,8 +293,13 @@ export const createRouter = ({
     if (scan.status !== 'complete')
       return res.status(409).json({ error: 'Scan is not complete', status: scan.status });
     const report = { ...scan.results, id: scan.id };
+    report.trend = store.timeline(scan.hostname, scan.tenant || 'default').map((point) => ({
+      scannedAt: point.scannedAt,
+      riskScore: point.riskScore,
+    }));
+    report.remediations = prioritizeRemediations(report);
     if (nmapId) {
-      const job = store.getNmap(String(nmapId));
+      const job = store.getNmap(String(nmapId), scan.tenant || 'default');
       const same =
         job &&
         job.operator &&
@@ -297,11 +328,12 @@ export const createRouter = ({
         20,
       );
       if (!domains.length) return res.status(400).json({ error: 'Provide a domains array' });
-      const bulk = store.createBulk(domains);
+      const bulk = store.createBulk(domains, tenantOf(req));
       const scanIds = domains.map((hostname) => {
         const scan = store.createScan({
           target: `https://${hostname}`,
           hostname,
+          tenant: tenantOf(req),
           bulkId: bulk.id,
           publicUrls: [],
         });
@@ -313,9 +345,9 @@ export const createRouter = ({
     }),
   );
   router.get('/bulk/:id', (req, res) => {
-    const bulk = store.getBulk(req.params.id);
+    const bulk = store.getBulk(req.params.id, tenantOf(req));
     if (!bulk) return res.status(404).json({ error: 'Bulk job not found' });
-    const scans = bulk.scanIds.map((id) => store.getScan(id)).filter(Boolean);
+    const scans = bulk.scanIds.map((id) => store.getScan(id, tenantOf(req))).filter(Boolean);
     return res.json({
       ...bulk,
       progress: {
@@ -327,7 +359,7 @@ export const createRouter = ({
     });
   });
 
-  router.get('/monitors', (req, res) => res.json({ monitors: store.listMonitors() }));
+  router.get('/monitors', (req, res) => res.json({ monitors: store.listMonitors(tenantOf(req)) }));
   router.post(
     '/monitors',
     wrap(async (req, res) => {
@@ -340,6 +372,7 @@ export const createRouter = ({
       const monitor = store.createMonitor({
         target: `https://${hostname}`,
         hostname,
+        tenant: tenantOf(req),
         everyMinutes,
         email: req.body?.email || null,
         publicUrls: Array.isArray(req.body?.publicUrls) ? req.body.publicUrls.slice(0, 8) : [],
@@ -348,6 +381,7 @@ export const createRouter = ({
       const scan = store.createScan({
         target: monitor.target,
         hostname,
+        tenant: tenantOf(req),
         email: monitor.email,
         publicUrls: monitor.publicUrls,
         monitorId: monitor.id,
@@ -362,17 +396,18 @@ export const createRouter = ({
     }),
   );
   router.delete('/monitors/:id', (req, res) => {
-    if (!store.getMonitor(req.params.id))
+    if (!store.getMonitor(req.params.id, tenantOf(req)))
       return res.status(404).json({ error: 'Monitor not found' });
-    store.deleteMonitor(req.params.id);
+    store.deleteMonitor(req.params.id, tenantOf(req));
     return res.status(204).end();
   });
   router.post('/monitors/:id/run', (req, res) => {
-    const monitor = store.getMonitor(req.params.id);
+    const monitor = store.getMonitor(req.params.id, tenantOf(req));
     if (!monitor) return res.status(404).json({ error: 'Monitor not found' });
     const scan = store.createScan({
       target: monitor.target,
       hostname: monitor.hostname,
+      tenant: tenantOf(req),
       email: monitor.email,
       publicUrls: monitor.publicUrls,
       monitorId: monitor.id,
@@ -386,7 +421,7 @@ export const createRouter = ({
     '/timeline',
     wrap(async (req, res) => {
       const hostname = hostFrom(req.query.target);
-      const rows = store.timeline(hostname);
+      const rows = store.timeline(hostname, tenantOf(req));
       const changes = rows
         .slice(1)
         .map((row, index) => ({ at: row.scannedAt, changes: diffScans(rows[index], row) }));
@@ -394,9 +429,37 @@ export const createRouter = ({
     }),
   );
   router.get(
+    '/history',
+    wrap(async (req, res) => {
+      const hostname = hostFrom(req.query.target);
+      const tenant = tenantOf(req);
+      const scans = store
+        .listScans(tenant)
+        .filter((scan) => scan.hostname === hostname)
+        .slice(0, 30);
+      const latest = scans.find((scan) => scan.status === 'complete');
+      return res.json({
+        target: hostname,
+        tenant,
+        scans: scans.map(publicScan),
+        trend: store.timeline(hostname, tenant).map((point) => ({
+          scannedAt: point.scannedAt,
+          riskScore: point.riskScore,
+        })),
+        latestFindings: latest?.results
+          ? {
+              risk: latest.results.risk || null,
+              summary: latest.results.executiveSummary || [],
+              changes: latest.changes || [],
+            }
+          : null,
+      });
+    }),
+  );
+  router.get(
     '/assets',
     wrap(async (req, res) =>
-      res.json(store.getAssets(hostFrom(req.query.target)) || { items: {} }),
+      res.json(store.getAssets(hostFrom(req.query.target), tenantOf(req)) || { items: {} }),
     ),
   );
 
@@ -410,22 +473,18 @@ export const createRouter = ({
       if (!req.body?.operator) return res.status(400).json({ error: 'Operator name is required' });
       const canonical = hostFrom(req.body.target);
       if (blockedInfrastructure(canonical)) {
-        return res
-          .status(400)
-          .json({
-            error: 'Refusing a metadata or local address',
-            canonical,
-            code: 'authorization-required',
-          });
+        return res.status(400).json({
+          error: 'Refusing a metadata or local address',
+          canonical,
+          code: 'authorization-required',
+        });
       }
       if (req.body.confirm !== canonical) {
-        return res
-          .status(400)
-          .json({
-            error: `Type the exact host ${canonical} to authorize it`,
-            canonical,
-            code: 'authorization-required',
-          });
+        return res.status(400).json({
+          error: `Type the exact host ${canonical} to authorize it`,
+          canonical,
+          code: 'authorization-required',
+        });
       }
       const resolved = await resolveSingleIp(canonical);
       if (!resolved.addresses.length)
@@ -441,6 +500,7 @@ export const createRouter = ({
       const record = store.saveAuthorization({
         target: canonical,
         ip: resolved.ip,
+        tenant: tenantOf(req),
         operator: String(req.body.operator).slice(0, 80),
         acknowledged: true,
         confirm: canonical,
@@ -456,7 +516,7 @@ export const createRouter = ({
       const available = await nmapAvailable(nmapRunner);
       if (!available.installed)
         return res.status(503).json({ error: available.message, code: 'nmap-missing' });
-      const auth = store.getAuthorization(req.body?.authorizationId);
+      const auth = store.getAuthorization(req.body?.authorizationId, tenantOf(req));
       if (!auth)
         return res
           .status(403)
@@ -472,6 +532,7 @@ export const createRouter = ({
         profile,
         target: auth.target,
         ip: auth.ip,
+        tenant: tenantOf(req),
         operator: auth.operator,
         authorizedAt: auth.authorizedAt,
       });
@@ -482,7 +543,7 @@ export const createRouter = ({
     }),
   );
   router.get('/nmap/:id', (req, res) => {
-    const job = store.getNmap(req.params.id);
+    const job = store.getNmap(req.params.id, tenantOf(req));
     if (!job) return res.status(404).json({ error: 'Nmap job not found' });
     return res.json(job);
   });
@@ -499,12 +560,10 @@ export const createRouter = ({
         return res.status(400).json({ error: 'Client name and operator are required' });
       const phrase = engagementPhrase(clientName);
       if (!req.body?.acknowledged || req.body?.confirm !== phrase) {
-        return res
-          .status(403)
-          .json({
-            error: `Checkbox and the exact phrase "${phrase}" are required`,
-            code: 'authorization-required',
-          });
+        return res.status(403).json({
+          error: `Checkbox and the exact phrase "${phrase}" are required`,
+          code: 'authorization-required',
+        });
       }
       const scope = [...new Set((req.body?.scope || []).map((item) => hostFrom(item)))];
       if (!scope.length)
@@ -515,6 +574,7 @@ export const createRouter = ({
         return res.status(400).json({ error: 'Engagement dates are invalid' });
       }
       const record = store.saveEngagement({
+        tenant: tenantOf(req),
         clientName,
         scope,
         start: req.body.start,
@@ -528,7 +588,7 @@ export const createRouter = ({
     }),
   );
   router.get('/engagements/:id', (req, res) => {
-    const engagement = store.getEngagement(req.params.id);
+    const engagement = store.getEngagement(req.params.id, tenantOf(req));
     if (!engagement) return res.status(404).json({ error: 'Engagement not found' });
     return res.json(publicEngagement(engagement));
   });
@@ -537,7 +597,7 @@ export const createRouter = ({
       return res
         .status(403)
         .json({ error: 'Pentest mode is disabled. Set WEBCHECK_PENTEST_ENABLED=true.' });
-    if (!store.getEngagement(req.params.id))
+    if (!store.getEngagement(req.params.id, tenantOf(req)))
       return res.status(404).json({ error: 'Engagement not found' });
     const allow = [
       'sessionCookie',
@@ -556,7 +616,7 @@ export const createRouter = ({
   router.post(
     '/engagements/:id/crawl',
     wrap(async (req, res) => {
-      const engagement = store.getEngagement(req.params.id);
+      const engagement = store.getEngagement(req.params.id, tenantOf(req));
       const result = await crawlInScope(
         engagement,
         req.body?.startUrl,
@@ -568,7 +628,7 @@ export const createRouter = ({
   router.post(
     '/engagements/:id/nuclei',
     wrap(async (req, res) => {
-      const engagement = store.getEngagement(req.params.id);
+      const engagement = store.getEngagement(req.params.id, tenantOf(req));
       const target = new URL(req.body?.target || '');
       assertEngagement(engagement, target.hostname);
       const available = await nucleiAvailable(nucleiRunner);
@@ -596,7 +656,7 @@ export const createRouter = ({
     }),
   );
   router.post('/engagements/:id/simulation', (req, res) => {
-    const engagement = store.getEngagement(req.params.id);
+    const engagement = store.getEngagement(req.params.id, tenantOf(req));
     if (!engagement) return res.status(404).json({ error: 'Engagement not found' });
     try {
       assertEngagement(engagement, engagement.scope[0]);
@@ -625,14 +685,23 @@ export const createRouter = ({
       let filename = req.body?.filename;
       let content = req.body?.content;
       if (req.body?.repo) {
+        const engagement = req.body?.engagementId
+          ? store.getEngagement(req.body.engagementId, tenantOf(req))
+          : null;
         const token =
-          req.body?.token || store.getSecrets(req.body?.engagementId || '')?.githubToken;
+          req.body?.token ||
+          (engagement ? store.getSecrets(engagement.id)?.githubToken : undefined);
         const fetched = await publicGithubLockfile(req.body.repo, { token });
         filename = fetched.filename;
         content = fetched.content;
       }
-      const packages = parseLockfile(filename, content);
-      return res.json(await queryOsv(packages));
+      const parsed = parseManifest(filename, content);
+      const report = await queryOsv(parsed.packages);
+      return res.json({
+        ...report,
+        sbom: buildSbom(parsed.packages, filename || 'upload'),
+        skipped: parsed.skipped,
+      });
     }),
   );
   router.post(
@@ -658,6 +727,7 @@ export const createRouter = ({
         target: url.hostname,
         url: url.href,
         path: url.pathname,
+        tenant: tenantOf(req),
         status: 'queued',
       });
       screenshots.push(shot.id);
@@ -666,11 +736,14 @@ export const createRouter = ({
   );
   router.get('/screenshots', (req, res) =>
     res.json({
-      screenshots: store.listScreenshots(req.query.target ? hostFrom(req.query.target) : ''),
+      screenshots: store.listScreenshots(
+        req.query.target ? hostFrom(req.query.target) : '',
+        tenantOf(req),
+      ),
     }),
   );
   router.get('/screenshots/:id.png', (req, res) => {
-    const shot = store.getScreenshot(req.params.id);
+    const shot = store.getScreenshot(req.params.id, tenantOf(req));
     if (!shot?.file) return res.status(404).json({ error: 'Screenshot not found' });
     const file = path.join(store.dir, 'screenshots', path.basename(shot.file));
     return res.sendFile(file);
@@ -678,12 +751,10 @@ export const createRouter = ({
 
   router.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
-    return res
-      .status(error.status || 500)
-      .json({
-        error: error.message || 'Request failed',
-        ...(error.code ? { code: error.code } : {}),
-      });
+    return res.status(error.status || 500).json({
+      error: error.message || 'Request failed',
+      ...(error.code ? { code: error.code } : {}),
+    });
   });
 
   for (const scan of store.listScans()) {
