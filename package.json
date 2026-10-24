@@ -18,7 +18,8 @@
     "lint": "eslint --config .config/eslint.config.js .",
     "format:check": "prettier --check --ignore-unknown '!yarn.lock' '!**/*.md' .",
     "format:fix": "prettier --write --ignore-unknown '!yarn.lock' '!**/*.md' .",
-    "hold-my-beer": "yarn format:fix && yarn lint && yarn typecheck"
+    "hold-my-beer": "yarn format:fix && yarn lint && yarn typecheck",
+    "test": "node --test api/cormorant/*.test.js"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",
@@ -45,6 +46,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.1",
     "framer-motion": "^14.0.0",
+    "pdfkit": "^0.20.2",
     "prop-types": "^15.8.1",
     "psl": "^1.15.0",
     "puppeteer": "24.43.1",

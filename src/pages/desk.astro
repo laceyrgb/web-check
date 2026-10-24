@@ -1,0 +1,11 @@
+---
+import PageLayout from '@layouts/Page.astro';
+import Desk from '../client/views/Desk';
+
+const description =
+  'Cormorant OSINT Desk for passive recon, monitoring, asset inventory, and authorized scans.';
+---
+
+<PageLayout title="OSINT Desk | Web Check" description={description} keywords="osint desk, recon, monitoring">
+  <Desk client:only="react" />
+</PageLayout>

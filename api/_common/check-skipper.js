@@ -105,10 +105,16 @@ const isBlockedTarget = (target) => {
 /* Checks which send the target to an outside service, so are useless for private hosts */
 const publicOnlyChecks = [
   'archives',
+  'attack-surface',
   'block-lists',
   'breaches',
+  'email-breaches',
   'dnssec',
   'location',
+  'lookalikes',
+  'network-exposure',
+  'public-mentions',
+  'public-people',
   'quality',
   'rank',
   'shodan',

@@ -44,6 +44,16 @@ import tlsSecurityAudit from './tls-security-audit';
 import tlsClientCompat from './tls-client-compat';
 import screenshot from './screenshot';
 import subdomains from './subdomains';
+import attackSurface from './attack-surface';
+import techCves from './tech-cves';
+import emailBreaches from './email-breaches';
+import networkExposure from './network-exposure';
+import lookalikes from './lookalikes';
+import publicMentions from './public-mentions';
+import posture from './posture';
+import cmsFingerprint from './cms-fingerprint';
+import privacyAudit from './privacy-audit';
+import publicPeople from './public-people';
 
 export type Resource = string | { title: string; link: string };
 
@@ -102,6 +112,16 @@ const all = {
   'tls-client-compat': tlsClientCompat,
   screenshot,
   subdomains,
+  'attack-surface': attackSurface,
+  'tech-cves': techCves,
+  'email-breaches': emailBreaches,
+  'network-exposure': networkExposure,
+  lookalikes,
+  'public-mentions': publicMentions,
+  posture,
+  'cms-fingerprint': cmsFingerprint,
+  'privacy-audit': privacyAudit,
+  'public-people': publicPeople,
 };
 
 export type CheckId = keyof typeof all;

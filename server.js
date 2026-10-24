@@ -7,6 +7,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 
 import { shouldSkip } from './api/_common/check-skipper.js';
+import { mountCormorant } from './api/cormorant/mount.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -133,6 +134,8 @@ const renderPlaceholderPage = async (res, msgId, logs) => {
   const htmlContent = placeholderContent.replace('<!-- CONTENT -->', errorMessage);
   res.status(500).send(htmlContent);
 };
+
+mountCormorant(app);
 
 // Create a single API endpoint to execute all lambda functions
 app.get(API_DIR, async (req, res) => {

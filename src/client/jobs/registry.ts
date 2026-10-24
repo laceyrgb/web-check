@@ -44,6 +44,7 @@ import TlsConnectionCard from 'client/components/Results/TlsConnection';
 import TlsSecurityAuditCard from 'client/components/Results/TlsSecurityAudit';
 import TlsClientCompatCard from 'client/components/Results/TlsClientCompat';
 import SubdomainsCard from 'client/components/Results/Subdomains';
+import RecordCard from 'client/components/Results/RecordCard';
 
 import { checks, type CheckId } from '@/data/checks';
 import type { CategoryId } from '@/data/categories';
@@ -387,6 +388,73 @@ export const jobs: JobSpec[] = [
     expectedAddressTypes: [...URL_ONLY],
     cards: [card('carbon', CarbonFootprintCard)],
     fetcher: fetchAndProcess('carbon?url=${url}'),
+  },
+  {
+    id: 'attack-surface',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('attack-surface', RecordCard)],
+    fetcher: fetchAndProcess('attack-surface?url=${url}'),
+  },
+  {
+    id: 'tech-cves',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('tech-cves', RecordCard)],
+    fetcher: fetchAndProcess('tech-cves?url=${url}'),
+  },
+  {
+    id: 'email-breaches',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('email-breaches', RecordCard)],
+    fetcher: fetchAndProcess('email-breaches?url=${url}'),
+  },
+  {
+    id: 'network-exposure',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('network-exposure', RecordCard)],
+    fetcher: fetchAndProcess('network-exposure?url=${url}'),
+  },
+  {
+    id: 'lookalikes',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('lookalikes', RecordCard)],
+    fetcher: fetchAndProcess('lookalikes?url=${url}'),
+  },
+  {
+    id: 'public-mentions',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('public-mentions', RecordCard)],
+    fetcher: fetchAndProcess('public-mentions?url=${url}'),
+  },
+  {
+    id: 'posture',
+    expectedAddressTypes: [...URL_ONLY],
+    cards: [card('posture', RecordCard)],
+    fetcher: fetchAndProcess('posture?url=${url}'),
+  },
+  {
+    id: 'cms-fingerprint',
+    expectedAddressTypes: [...URL_ONLY],
+    noClientTimeout: true,
+    cards: [card('cms-fingerprint', RecordCard)],
+    fetcher: fetchAndProcess('cms-fingerprint?url=${url}'),
+  },
+  {
+    id: 'privacy-audit',
+    expectedAddressTypes: [...URL_ONLY],
+    cards: [card('privacy-audit', RecordCard)],
+    fetcher: fetchAndProcess('privacy-audit?url=${url}'),
+  },
+  {
+    id: 'public-people',
+    expectedAddressTypes: [...URL_ONLY],
+    cards: [card('public-people', RecordCard)],
+    fetcher: fetchAndProcess('public-people?url=${url}'),
   },
 ];
 

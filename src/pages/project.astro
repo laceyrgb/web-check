@@ -1,0 +1,15 @@
+---
+import PageLayout from '@layouts/Page.astro';
+import ProjectPage from '../client/components/ProjectMap';
+
+const description =
+  'Open one host in the full Web Check report, each category checker, and every OSINT desk section.';
+---
+
+<PageLayout
+  title="Project map | Web Check"
+  description={description}
+  keywords="project map, osint desk, web check"
+>
+  <ProjectPage client:only="react" />
+</PageLayout>
