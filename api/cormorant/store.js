@@ -14,6 +14,7 @@ const empty = () => ({
   timeline: { [DEFAULT_TENANT]: {} },
   nmapJobs: {},
   screenshots: {},
+  investigations: {},
   __tenants: 1,
 });
 
@@ -37,6 +38,7 @@ const migrateTenants = (state) => {
     'engagements',
     'nmapJobs',
     'screenshots',
+    'investigations',
   ]) {
     state[name] ||= {};
     for (const row of Object.values(state[name])) {
@@ -61,6 +63,7 @@ export const createFileStore = (
       state = migrateTenants(JSON.parse(fs.readFileSync(file, 'utf8')));
       state.nmapJobs ||= {};
       state.screenshots ||= {};
+      state.investigations ||= {};
       state.scans ||= {};
       state.timeline ||= { [DEFAULT_TENANT]: {} };
       state.assets ||= { [DEFAULT_TENANT]: {} };
@@ -279,6 +282,35 @@ export const createFileStore = (
       const shot = load().screenshots[shotId] || null;
       return owned(shot, tenant) ? shot : null;
     },
+    createInvestigation(input) {
+      const row = {
+        id: id(),
+        status: 'running',
+        stage: 'root',
+        createdAt: new Date().toISOString(),
+        log: [],
+        ...input,
+        tenant: input.tenant || DEFAULT_TENANT,
+      };
+      load().investigations[row.id] = row;
+      save();
+      return row;
+    },
+    getInvestigation: (investigationId, tenant) => {
+      const row = load().investigations[investigationId] || null;
+      return owned(row, tenant) ? row : null;
+    },
+    updateInvestigation(investigationId, patch) {
+      const row = load().investigations[investigationId];
+      if (!row) return null;
+      Object.assign(row, patch);
+      save();
+      return row;
+    },
+    listInvestigations: (tenant) =>
+      Object.values(load().investigations)
+        .filter((row) => owned(row, tenant))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     listNmap: (tenant) => Object.values(load().nmapJobs).filter((row) => owned(row, tenant)),
     listAuthorizations: (tenant) =>
       Object.values(load().authorizations).filter((row) => owned(row, tenant)),
@@ -302,6 +334,7 @@ export const createFileStore = (
         nmapJobs: drop('nmapJobs', spec.nmapIds),
         screenshots: drop('screenshots', spec.screenshotIds),
         authorizations: drop('authorizations', spec.authorizationIds),
+        investigations: drop('investigations', spec.investigationIds),
       };
       const assets = state.assets?.[tenant];
       const timeline = state.timeline?.[tenant];

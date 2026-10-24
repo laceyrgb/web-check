@@ -74,6 +74,32 @@ curl -s -X POST localhost:3000/api/v1/links \
 
 `target` fetches that page, keeps the http(s) links on it, and adds public subdomain names. It does not crawl onward from those links. Poll `GET /api/v1/bulk/:id` when the response includes `bulkId`.
 
+## Investigations
+
+```bash
+curl -s -X POST localhost:3000/api/v1/investigations \
+  -H 'content-type: application/json' \
+  -d '{"target":"example.com","maxHosts":12}'
+```
+
+Returns 202 with `id`, `status` (`running`, `complete`, `failed`), `stage` (`root`, `hosts`, `done`), `rootScanId`, and a `log`. The root scan runs first. Its passive hostnames, certificate names, MX hosts, and same-IP neighbours are sieved to the same registrable domain, ranked by what an analyst opens first, and the top `maxHosts` (1 to 12) are scanned. A host scan this tenant completed within 24 hours is reused and named under `reused`. In-scope hosts beyond the cap are `held`. Names on other domains are `related` and not scanned.
+
+| Route | Returns |
+| --- | --- |
+| `GET /api/v1/investigations` | The tenant's last 50 investigations with progress and per-host status. |
+| `GET /api/v1/investigations/:id` | Status, `progress`, `hosts` (`host`, `scanId`, `status`, `risk`, `reused`), `held`, `related`, `log`. |
+| `GET /api/v1/investigations/:id/report` | The consolidated dossier. 409 until `status` is `complete`. |
+| `GET /api/v1/investigations/:id/report.pdf` | The same dossier as a PDF with the Cormorant header. |
+| `POST /api/v1/investigations/:id/notes` | Stores `summary` (up to 4000 characters) and `dispositions` (`{ findingKey: 'accepted' \| 'false-positive' \| 'fixed' }`; `open` clears one). |
+
+The report carries `coverage`, `risk` (`score`, `letter`, `min`, `mean`, `perHost`), `facts` (`kind`, `value`, `confidence`, `sources`, `hosts`, up to 12 `evidence` pairs), `findings` (`key`, `host`, `hosts`, `scope`, `source`, `detail`, `points`, `action`, `disposition`), `gaps` (`gap`, `why`, `next`), `counts`, `narrative`, `analystSummary`, and `notesUpdatedAt`. Confidence counts distinct sources: three or more is `high`, two `medium`, one `low`; for host-specific kinds (`ip`, `service`, `tech`, `cve`, `hosting`, `cloud`, `local-path`) each host and source pair is a source. Findings with `scope: 'domain'` (`lookalike`, `breach`, `leak-index`, `mail`, `certificate`) are keyed to the registrable domain and listed once; `hosts` names the scans that reported them. The organisation score is `round(0.6 × weakest + 0.4 × mean)`. Dispositions are applied when the report is generated, so a saved note changes the next `report` and `report.pdf` without a rescan.
+
+```bash
+curl -s -X POST localhost:3000/api/v1/investigations/$ID/notes \
+  -H 'content-type: application/json' \
+  -d '{"summary":"RDP exposure accepted by the client until Q1.","dispositions":{"vpn.example.com|port|3389/ms-wbt-server":"accepted"}}'
+```
+
 ## Monitoring, timeline, inventory
 
 ```bash

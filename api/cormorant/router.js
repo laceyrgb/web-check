@@ -14,6 +14,7 @@ import {
   assertPublicTarget,
   blockedInfrastructure,
   canonicalHost,
+  domainOf,
   flagOn,
   httpError,
   robotsAllows,
@@ -21,6 +22,13 @@ import {
 import { invoke, targetUrl } from './hosts.js';
 import { collectPublicRecords } from './records.js';
 import { classifyHosts, collectLinkDump } from './links.js';
+import {
+  INVESTIGATION_HOST_CAP,
+  REUSE_WINDOW_MS,
+  applyNotes,
+  consolidate,
+  pivotHosts,
+} from './investigation.js';
 import { assertNmapAuthorized, nmapAvailable, parseNmapXml, resolveSingleIp } from './nmap.js';
 import {
   assertEngagement,
@@ -54,6 +62,7 @@ const publicScan = (scan) => ({
   risk: scan.results?.risk || null,
   monitorId: scan.monitorId || null,
   bulkId: scan.bulkId || null,
+  investigationId: scan.investigationId || null,
 });
 
 export const parseEveryMinutes = (body = {}) => {
@@ -152,7 +161,177 @@ export const createRouter = ({
       if (scan.monitorId) store.updateMonitor(scan.monitorId, { running: false });
       if (scan.bulkId) store.refreshBulk(scan.bulkId);
     }
+    if (scan.investigationId) {
+      try {
+        await advanceInvestigation(scan.investigationId);
+      } catch (error) {
+        store.updateInvestigation(scan.investigationId, {
+          status: 'failed',
+          error: error.message,
+          finishedAt: new Date().toISOString(),
+        });
+      }
+    }
   };
+
+  const recentComplete = (hostname, tenant) =>
+    store
+      .listScans(tenant)
+      .find(
+        (scan) =>
+          scan.hostname === hostname &&
+          scan.status === 'complete' &&
+          scan.results &&
+          Date.now() - Date.parse(scan.finishedAt || scan.createdAt) < REUSE_WINDOW_MS,
+      );
+
+  const investigationScans = (inv) =>
+    [inv.rootScanId, ...(inv.hostScanIds || [])].map((id) => store.getScan(id)).filter(Boolean);
+
+  // Moves an investigation forward: plan pivots after the root scan, then consolidate
+  // once every host scan has finished. Safe to call more than once.
+  const advanceInvestigation = async (investigationId) => {
+    const inv = store.getInvestigation(investigationId);
+    if (!inv || inv.status !== 'running') return;
+    const stamp = () => new Date().toISOString();
+    const log = (line) => {
+      const current = store.getInvestigation(investigationId);
+      store.updateInvestigation(investigationId, {
+        log: [...(current.log || []), { at: stamp(), line }].slice(-60),
+      });
+    };
+    if (inv.stage === 'root') {
+      const root = store.getScan(inv.rootScanId);
+      if (!root || root.status === 'queued' || root.status === 'running') return;
+      if (root.status === 'failed') {
+        store.updateInvestigation(investigationId, {
+          status: 'failed',
+          error: root.error || 'Root scan failed',
+          finishedAt: stamp(),
+        });
+        return;
+      }
+      const plan = pivotHosts(root.results, {
+        domain: inv.domain,
+        host: inv.hostname,
+        cap: inv.maxHosts,
+      });
+      const hostScanIds = [];
+      const reused = [];
+      const skipped = [];
+      for (const item of plan.selected) {
+        try {
+          assertPublicTarget(item.host);
+        } catch (error) {
+          skipped.push({ host: item.host, reason: error.message });
+          continue;
+        }
+        const recent = recentComplete(item.host, inv.tenant);
+        if (recent) {
+          hostScanIds.push(recent.id);
+          reused.push(item.host);
+          continue;
+        }
+        const scan = store.createScan({
+          target: `https://${item.host}`,
+          hostname: item.host,
+          tenant: inv.tenant,
+          investigationId,
+          publicUrls: [],
+        });
+        hostScanIds.push(scan.id);
+      }
+      store.updateInvestigation(investigationId, {
+        stage: 'hosts',
+        plan: { ...plan, skipped },
+        hostScanIds,
+        reused,
+      });
+      log(
+        `Root scan complete. ${plan.selected.length} in-scope host(s) selected, ${reused.length} reused, ${plan.held.length} held, ${plan.related.length} related host(s) on other domains left unscanned.`,
+      );
+      for (const item of plan.selected) {
+        if (!reused.includes(item.host) && !skipped.some((row) => row.host === item.host))
+          log(`Pivot to ${item.host}: ${item.reason} (${item.sources.join(', ')}).`);
+      }
+      for (const scanId of hostScanIds) {
+        const row = store.getScan(scanId);
+        if (row && row.status === 'queued' && row.investigationId === investigationId)
+          scans.push(scanId);
+      }
+    }
+    const current = store.getInvestigation(investigationId);
+    if (current.stage !== 'hosts') return;
+    const rows = investigationScans(current);
+    if (rows.some((scan) => scan.status === 'queued' || scan.status === 'running')) return;
+    const report = consolidate({
+      target: current.target,
+      domain: current.domain,
+      hostname: current.hostname,
+      scans: rows,
+      plan: current.plan,
+      reused: current.reused || [],
+      startedAt: current.createdAt,
+      notes: current.notes || null,
+    });
+    store.updateInvestigation(investigationId, {
+      stage: 'done',
+      status: 'complete',
+      finishedAt: stamp(),
+      report,
+    });
+    log(
+      `Consolidated ${report.coverage.scanned} host result(s) into ${report.facts.length} fact(s), ${report.findings.length} finding(s), and ${report.gaps.length} gap(s).`,
+    );
+  };
+
+  const publicInvestigation = (inv) => {
+    const rows = investigationScans(inv);
+    return {
+      id: inv.id,
+      target: inv.target,
+      hostname: inv.hostname,
+      domain: inv.domain,
+      status: inv.status,
+      stage: inv.stage,
+      maxHosts: inv.maxHosts,
+      createdAt: inv.createdAt,
+      finishedAt: inv.finishedAt || null,
+      error: inv.error || null,
+      rootScanId: inv.rootScanId,
+      hostScanIds: inv.hostScanIds || [],
+      reused: inv.reused || [],
+      held: inv.plan?.held || [],
+      related: inv.plan?.related || [],
+      progress: {
+        total: rows.length,
+        complete: rows.filter((scan) => scan.status === 'complete' || scan.status === 'failed')
+          .length,
+      },
+      hosts: rows.map((scan) => ({
+        host: scan.hostname,
+        scanId: scan.id,
+        status: scan.status,
+        risk: scan.results?.risk?.score ?? null,
+        reused: (inv.reused || []).includes(scan.hostname) && scan.investigationId !== inv.id,
+      })),
+      log: inv.log || [],
+      hasNotes: Boolean(inv.notes),
+      organisationRisk: inv.report?.risk?.score ?? null,
+    };
+  };
+
+  const investigationReport = (inv) =>
+    consolidate({
+      target: inv.target,
+      domain: inv.domain,
+      hostname: inv.hostname,
+      scans: investigationScans(inv),
+      plan: inv.plan,
+      reused: inv.reused || [],
+      startedAt: inv.createdAt,
+      notes: inv.notes || null,
+    });
 
   const scans = createQueue(finishScan, {
     concurrency: Number(process.env.WEBCHECK_SCAN_CONCURRENCY || 1),
@@ -393,6 +572,91 @@ export const createRouter = ({
   };
   router.post('/bulk', wrap(respondLinks));
   router.post('/links', wrap(respondLinks));
+
+  router.post(
+    '/investigations',
+    wrap(async (req, res) => {
+      try {
+        const hostname = hostFrom(req.body?.target);
+        assertPublicTarget(hostname);
+        const requested = Number(req.body?.maxHosts);
+        const maxHosts = Number.isFinite(requested)
+          ? Math.max(1, Math.min(INVESTIGATION_HOST_CAP, Math.floor(requested)))
+          : INVESTIGATION_HOST_CAP;
+        const tenant = tenantOf(req);
+        const inv = store.createInvestigation({
+          target: `https://${hostname}`,
+          hostname,
+          domain: domainOf(hostname),
+          tenant,
+          maxHosts,
+        });
+        const root = store.createScan({
+          target: inv.target,
+          hostname,
+          tenant,
+          investigationId: inv.id,
+          publicUrls: [],
+        });
+        store.updateInvestigation(inv.id, {
+          rootScanId: root.id,
+          log: [
+            {
+              at: new Date().toISOString(),
+              line: `Root scan of ${hostname} queued. Pivots stay under ${inv.domain}; at most ${maxHosts} host(s).`,
+            },
+          ],
+        });
+        scans.push(root.id);
+        return res.status(202).json(publicInvestigation(store.getInvestigation(inv.id)));
+      } catch (error) {
+        return res.status(error.status || 500).json({ error: error.message });
+      }
+    }),
+  );
+  router.get('/investigations', (req, res) =>
+    res.json({
+      investigations: store.listInvestigations(tenantOf(req)).slice(0, 50).map(publicInvestigation),
+    }),
+  );
+  router.get('/investigations/:id', (req, res) => {
+    const inv = store.getInvestigation(req.params.id, tenantOf(req));
+    if (!inv) return res.status(404).json({ error: 'Investigation not found' });
+    return res.json(publicInvestigation(inv));
+  });
+  router.get('/investigations/:id/report', (req, res) => {
+    const inv = store.getInvestigation(req.params.id, tenantOf(req));
+    if (!inv) return res.status(404).json({ error: 'Investigation not found' });
+    if (inv.status !== 'complete')
+      return res
+        .status(409)
+        .json({ error: 'Investigation is not complete', status: inv.status, stage: inv.stage });
+    return res.json({ id: inv.id, ...investigationReport(inv) });
+  });
+  router.post('/investigations/:id/notes', (req, res) => {
+    const inv = store.getInvestigation(req.params.id, tenantOf(req));
+    if (!inv) return res.status(404).json({ error: 'Investigation not found' });
+    const notes = applyNotes(inv.notes || {}, req.body || {});
+    store.updateInvestigation(inv.id, { notes });
+    return res.json({ id: inv.id, notes });
+  });
+  router.get(
+    '/investigations/:id/report.pdf',
+    wrap(async (req, res) => {
+      const inv = store.getInvestigation(req.params.id, tenantOf(req));
+      if (!inv) return res.status(404).json({ error: 'Investigation not found' });
+      if (inv.status !== 'complete')
+        return res.status(409).json({ error: 'Investigation is not complete', status: inv.status });
+      const { renderInvestigation } = await import('./pdf.js');
+      const pdf = await renderInvestigation({ id: inv.id, ...investigationReport(inv) });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="cormorant-investigation-${inv.hostname.replace(/[^a-z0-9.-]/gi, '')}.pdf"`,
+      );
+      return res.send(pdf);
+    }),
+  );
   router.get('/bulk/:id', (req, res) => {
     const bulk = store.getBulk(req.params.id, tenantOf(req));
     if (!bulk) return res.status(404).json({ error: 'Bulk job not found' });

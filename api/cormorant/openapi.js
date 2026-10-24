@@ -19,6 +19,21 @@ export const openapi = {
         summary: 'Harvest links from a page or a pasted dump, then queue the new hosts',
       },
     },
+    '/api/v1/investigations': {
+      get: { summary: 'List investigations for this tenant' },
+      post: {
+        summary:
+          'Start an autonomous investigation: root scan, pivot to in-scope hosts, one consolidated dossier',
+      },
+    },
+    '/api/v1/investigations/{id}': { get: { summary: 'Investigation status and host progress' } },
+    '/api/v1/investigations/{id}/report': {
+      get: { summary: 'Consolidated dossier: facts with confidence, findings, gaps, narrative' },
+    },
+    '/api/v1/investigations/{id}/report.pdf': { get: { summary: 'Investigation PDF' } },
+    '/api/v1/investigations/{id}/notes': {
+      post: { summary: 'Analyst case file: summary and per-finding dispositions' },
+    },
     '/api/v1/monitors': {
       get: { summary: 'List monitors' },
       post: { summary: 'Create an interval monitor' },

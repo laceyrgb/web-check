@@ -59,6 +59,22 @@ It does not run Nmap, Nuclei, an authenticated crawl, or anything that tries pas
 
 `POST /api/v1/links` takes a pasted dump, a page, or both. Pasted lines and the links on that one page are grouped by host. Repeated paths on the same host collapse. Hosts this tenant already queued or completed are listed under `alreadyScanned` and skipped. Failed hosts are queued again. Public subdomain names for the harvested page are included. The harvest does not fetch the other links it found. At most 80 new hosts are queued; further unique hosts are returned as `held` so a second pass can take the next batch. `/desk` has Queue pasted links and Harvest this page.
 
+## Investigation
+
+`POST /api/v1/investigations` runs the whole passive workflow for one organisation without an operator in the loop. It scans the root host, reads the hosts that passive sources returned for it, and pivots to the ones under the same registrable domain in the order an analyst would open them: remote access (`vpn`, `citrix`, `rdp`), mail (`mail`, `owa`, `autodiscover`, MX hosts), identity (`sso`, `login`, `adfs`), administration (`admin`, `portal`, `cpanel`), pre-production (`dev`, `staging`, `uat`), then source control, build systems, file transfer, databases, and the rest. At most 12 hosts are scanned per investigation (`maxHosts`, 1 to 12). A host this tenant completed in the last 24 hours is reused, not rescanned. Hosts beyond the cap are returned as `held`. Hostnames on other domains, including same-IP neighbours and certificate SANs, are listed under `related` and are never scanned.
+
+When the last host scan finishes the results are merged into one dossier:
+
+- **Facts** with a confidence. `high` means three or more independent sources produced the same value, `medium` two, `low` one. For host-specific facts (IP, service, technology, CVE, hosting, local path) each host and source pair counts as a source; for domain-level facts (hostnames, lookalikes, mail policy, registrant data, people) the same lookup repeated from another host adds nothing. A person name that does not also appear on the organisation's own pages is always `low`.
+- **Organisation risk** weighted toward the weakest host: `round(0.6 × min + 0.4 × mean)` of the per-host scores.
+- **Findings** with a disposition each: `open`, `accepted`, `false-positive`, or `fixed`. Host-level findings (CVE, port, posture, CMS, document) are listed per host. Domain-level findings (lookalike, breach, leak link, mail policy, certificate) are listed once against the domain with the hosts that reported them.
+- **Intelligence gaps**: what the public record did not answer and the next legal step. A gap is not a finding.
+- **Narrative** and a collection log with the reason for every pivot.
+
+`POST /api/v1/investigations/:id/notes` stores the analyst summary and the dispositions on the investigation. They are applied every time the report or the PDF is generated. `GET /api/v1/investigations/:id/report.pdf` writes the dossier with the Cormorant header. Investigations are tenant scoped and travel with the offline export. `/desk` renders the hosts table, log, facts, findings with disposition selectors, gaps, and the summary field under Investigation.
+
+An investigation never leaves the registrable domain, never fetches every harvested link, and runs no Nmap, Nuclei, crawl, or credential test. Those keep their own gates.
+
 ## Owner dossier
 
 After the first pass, the scan keeps going while new public identifiers appear, for up to three rounds and twelve lookups. A phone or copyright name on the page is enough to check domain RDAP, `security.txt`, SPF, and DMARC. An email those records add is then checked in the breach index, on Gravatar, and on the public OpenPGP keyserver. A registrant email on a different domain gets one RDAP lookup for the organization name. That domain is not scanned.

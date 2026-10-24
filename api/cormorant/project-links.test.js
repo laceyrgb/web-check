@@ -22,6 +22,10 @@ test('a pasted url becomes the host used by every project link', () => {
     '/desk?target=example.com#records',
   );
   assert.equal(
+    map.groups[1].links.find((link) => link.label === 'Investigation')?.href,
+    '/desk?target=example.com#investigation',
+  );
+  assert.equal(
     map.groups[2].links.find((link) => link.label === 'Project map')?.href,
     '/project?target=example.com',
   );

@@ -110,6 +110,9 @@ export const collectBundle = async ({ store, tenant, target, renderReport = defa
   const authorizations = (store.listAuthorizations?.(tenant) || []).filter((row) =>
     sameHost(row.target || row.hostname, target),
   );
+  const investigations = (store.listInvestigations?.(tenant) || []).filter((row) =>
+    sameHost(row.hostname, target),
+  );
   const hosts = [...new Set(scans.map((scan) => scan.hostname).filter(Boolean))];
   if (!scans.length && !monitors.length && !nmapJobs.length) {
     throw httpError(409, 'Nothing stored for this tenant yet', { code: 'export-empty' });
@@ -159,6 +162,10 @@ export const collectBundle = async ({ store, tenant, target, renderReport = defa
     name: 'authorizations.json',
     data: JSON.stringify(stripPrivate(authorizations), null, 2),
   });
+  files.push({
+    name: 'investigations.json',
+    data: JSON.stringify(stripPrivate(investigations), null, 2),
+  });
   const shotFiles = [];
   for (const shot of shots) {
     if (!shot.file) continue;
@@ -191,6 +198,7 @@ export const collectBundle = async ({ store, tenant, target, renderReport = defa
       nmapIds: nmapJobs.map((row) => row.id),
       screenshotIds: shots.map((row) => row.id),
       authorizationIds: authorizations.map((row) => row.id),
+      investigationIds: investigations.map((row) => row.id),
       hosts,
     },
   };

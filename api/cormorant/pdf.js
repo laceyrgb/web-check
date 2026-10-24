@@ -40,6 +40,111 @@ const drawTrend = (pdf, points) => {
   pdf.y = top + height + 10;
 };
 
+const header = (pdf, subtitle) => {
+  pdf.rect(0, 0, pdf.page.width, 72).fill('#0B1F33');
+  pdf.fillColor('#ffffff').fontSize(20).text('Cormorant Cyber', 48, 24);
+  pdf.fontSize(10).text(subtitle, 48, 48);
+  pdf.fillColor('#1c1c1c');
+  pdf.y = 96;
+};
+
+const DISCLAIMER =
+  'Findings are limited to data collected for this scan. Sources are named in each section. Cormorant Cyber does not treat a missing finding as proof of safety.';
+
+const document = async (subtitle, draw) => {
+  const PDFDocument = await loadPdf();
+  return new Promise((resolve, reject) => {
+    const pdf = new PDFDocument({ size: 'A4', margin: 48, compress: false });
+    const chunks = [];
+    pdf.on('data', (chunk) => chunks.push(chunk));
+    pdf.on('end', () => resolve(Buffer.concat(chunks)));
+    pdf.on('error', reject);
+    header(pdf, subtitle);
+    draw(pdf);
+    pdf.moveDown();
+    pdf.fontSize(8).fillColor('#444').text(DISCLAIMER);
+    pdf.end();
+  });
+};
+
+export const renderInvestigation = (report) =>
+  document('Organisation investigation · Dubai', (pdf) => {
+    pdf.fontSize(11).text(`Target: ${report.target || 'unknown'}`);
+    pdf.text(`Registrable domain: ${report.domain || 'unknown'}`);
+    pdf.text(`Started: ${report.startedAt || 'unknown'}`);
+    pdf.text(`Generated: ${report.generatedAt || 'unknown'}`);
+    if (report.id) pdf.text(`Investigation id: ${report.id}`);
+    section(
+      pdf,
+      'Analyst summary',
+      report.analystSummary
+        ? [report.analystSummary, `Analyst notes updated ${report.notesUpdatedAt || ''}`.trim()]
+        : report.narrative || [],
+    );
+    if (report.analystSummary) section(pdf, 'Collection narrative', report.narrative || []);
+    const coverage = report.coverage || {};
+    section(pdf, 'Coverage', [
+      `Hosts requested: ${coverage.requested ?? 0}`,
+      `Hosts scanned: ${coverage.scanned ?? 0}`,
+      `Results reused (under 24 hours old): ${coverage.reused ?? 0}`,
+      `Scans failed: ${coverage.failed ?? 0}`,
+      `In-scope hosts held by the cap: ${(coverage.held || []).join(', ') || 'none'}`,
+      `Related hosts on other domains (not scanned): ${
+        (coverage.related || []).map((row) => row.host).join(', ') || 'none'
+      }`,
+      ...(coverage.selected || []).map(
+        (row) => `Pivot ${row.host}: ${row.reason} (${(row.sources || []).join(', ')})`,
+      ),
+    ]);
+    const risk = report.risk || {};
+    section(pdf, 'Organisation risk', [
+      risk.score == null
+        ? 'No host produced a risk score.'
+        : `${risk.score} (${risk.letter}) weighted 60% to the weakest host; weakest ${risk.min}, mean ${risk.mean}.`,
+      ...(risk.perHost || []).map(
+        (row) =>
+          `${row.host}: ${row.score ?? 'n/a'} (${row.letter})${row.reused ? ' reused' : ''} scan ${row.scanId}`,
+      ),
+    ]);
+    const facts = report.facts || [];
+    section(
+      pdf,
+      `Facts (${facts.length})`,
+      facts.length
+        ? facts
+            .slice(0, 80)
+            .map(
+              (row) =>
+                `[${row.confidence}] ${row.kind} ${row.value}${row.severity ? ` ${row.severity}` : ''}${row.detail ? ` — ${row.detail}` : ''} · ${(row.sources || []).join(', ')} · ${(row.hosts || []).join(', ')}`,
+            )
+            .concat(
+              facts.length > 80
+                ? [`${facts.length - 80} further fact(s) are in the JSON report.`]
+                : [],
+            )
+        : ['No facts were collected.'],
+    );
+    const findings = report.findings || [];
+    section(
+      pdf,
+      `Findings (${findings.length})`,
+      findings.length
+        ? findings.map(
+            (row) =>
+              `-${row.points} ${row.host}${row.scope === 'domain' ? ' (domain)' : ''} ${row.source}: ${row.detail} [${row.disposition}]${row.action ? ` → ${row.action}` : ''}`,
+          )
+        : ['No weighted finding was recorded on any host.'],
+    );
+    section(
+      pdf,
+      'Intelligence gaps',
+      (report.gaps || []).length
+        ? (report.gaps || []).flatMap((row) => [`${row.gap}: ${row.why}`, `   Next: ${row.next}`])
+        : ['The public record answered every question this tool asks.'],
+    );
+    section(pdf, 'Collection', [report.note]);
+  });
+
 export const renderReport = async (report) => {
   const PDFDocument = await loadPdf();
   return new Promise((resolve, reject) => {
@@ -48,11 +153,7 @@ export const renderReport = async (report) => {
     pdf.on('data', (chunk) => chunks.push(chunk));
     pdf.on('end', () => resolve(Buffer.concat(chunks)));
     pdf.on('error', reject);
-    pdf.rect(0, 0, pdf.page.width, 72).fill('#0B1F33');
-    pdf.fillColor('#ffffff').fontSize(20).text('Cormorant Cyber', 48, 24);
-    pdf.fontSize(10).text('OSINT assessment · Dubai', 48, 48);
-    pdf.fillColor('#1c1c1c');
-    pdf.y = 96;
+    header(pdf, 'OSINT assessment · Dubai');
     pdf.fontSize(11).text(`Target: ${report.target || 'unknown'}`);
     pdf.text(`Scan time: ${report.scannedAt || 'unknown'}`);
     if (report.id) pdf.text(`Scan id: ${report.id}`);
@@ -248,12 +349,7 @@ export const renderReport = async (report) => {
       );
     }
     pdf.moveDown();
-    pdf
-      .fontSize(8)
-      .fillColor('#444')
-      .text(
-        'Findings are limited to data collected for this scan. Sources are named in each section. Cormorant Cyber does not treat a missing finding as proof of safety.',
-      );
+    pdf.fontSize(8).fillColor('#444').text(DISCLAIMER);
     pdf.end();
   });
 };

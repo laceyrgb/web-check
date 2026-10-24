@@ -13,6 +13,7 @@ const CHECKERS = [
 
 const DESK_SECTIONS = [
   ['scan', 'Scan'],
+  ['investigation', 'Investigation'],
   ['links', 'Link list'],
   ['history', 'History'],
   ['records', 'Public record'],

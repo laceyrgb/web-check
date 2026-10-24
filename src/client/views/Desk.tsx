@@ -49,11 +49,54 @@ const Page = styled.div`
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+  }
+  th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.3rem 0.4rem;
+    border-bottom: 1px solid ${colors.primaryTransparent};
+    overflow-wrap: anywhere;
+  }
+  .muted {
+    opacity: 0.75;
+  }
 `;
 
 const deskApi = () => {
   const root = (import.meta.env.PUBLIC_API_ENDPOINT || '/api').replace(/\/$/, '');
   return root.endsWith('/api') ? `${root}/v1` : `${root}/api/v1`;
+};
+
+const downloadFile = async (apiKey: string, path: string, filename: string) => {
+  const headers = new Headers();
+  if (apiKey) headers.set('x-api-key', apiKey);
+  const response = await fetch(`${deskApi()}${path}`, { headers });
+  if (!response.ok) {
+    const text = await response.text();
+    let message = text;
+    try {
+      message = JSON.parse(text).error || message;
+    } catch {
+      message = text;
+    }
+    throw new Error(message || `HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+  return filename;
 };
 
 const Desk = (): JSX.Element => {
@@ -179,6 +222,7 @@ const Desk = (): JSX.Element => {
         </button>
         <Monitor onRun={run} call={call} target={target} />
       </section>
+      <Investigation target={target} apiKey={apiKey} onRun={run} call={call} />
       <Links target={target} onRun={run} call={call} />
       <History target={target} onRun={run} call={call} />
       <Records target={target} onRun={run} call={call} />
@@ -188,6 +232,331 @@ const Desk = (): JSX.Element => {
       <Audit onRun={run} call={call} />
       <pre>{output}</pre>
     </Page>
+  );
+};
+
+type Disposition = 'open' | 'accepted' | 'false-positive' | 'fixed';
+
+interface InvestigationStatus {
+  id: string;
+  status: string;
+  stage: string;
+  domain: string;
+  progress: { total: number; complete: number };
+  hosts: { host: string; scanId: string; status: string; risk: number | null; reused: boolean }[];
+  held: string[];
+  related: { host: string; source: string }[];
+  log: { at: string; line: string }[];
+  error: string | null;
+}
+
+interface InvestigationReport {
+  id: string;
+  narrative: string[];
+  analystSummary: string | null;
+  risk: {
+    score: number | null;
+    letter: string;
+    min: number | null;
+    mean: number | null;
+    perHost: { host: string; score: number | null; letter: string; reused: boolean }[];
+  };
+  coverage: { requested: number; scanned: number; reused: number; failed: number };
+  facts: {
+    kind: string;
+    value: string;
+    confidence: string;
+    sources: string[];
+    hosts: string[];
+    severity?: string;
+    detail?: string;
+  }[];
+  findings: {
+    key: string;
+    host: string;
+    hosts: string[];
+    scope: 'host' | 'domain';
+    source: string;
+    detail: string;
+    points: number;
+    action: string | null;
+    disposition: Disposition;
+  }[];
+  gaps: { gap: string; why: string; next: string }[];
+  note: string;
+}
+
+const Investigation = ({
+  target,
+  apiKey,
+  onRun,
+  call,
+}: {
+  target: string;
+  apiKey: string;
+  onRun: (work: () => Promise<unknown>) => void;
+  call: (path: string, init?: RequestInit) => Promise<any>;
+}) => {
+  const [maxHosts, setMaxHosts] = useState('12');
+  const [status, setStatus] = useState<InvestigationStatus | null>(null);
+  const [report, setReport] = useState<InvestigationReport | null>(null);
+  const [summary, setSummary] = useState('');
+  const [dispositions, setDispositions] = useState<Record<string, Disposition>>({});
+  const id = status?.id || '';
+
+  const start = () =>
+    onRun(async () => {
+      const body = await call('/investigations', {
+        method: 'POST',
+        body: JSON.stringify({ target, maxHosts: Number(maxHosts) }),
+      });
+      setStatus(body);
+      setReport(null);
+      setDispositions({});
+      return body;
+    });
+  const refresh = () =>
+    onRun(async () => {
+      const body = await call(`/investigations/${id}`);
+      setStatus(body);
+      return body;
+    });
+  const loadLatest = () =>
+    onRun(async () => {
+      const wanted = target
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .split(/[/?#]/)[0];
+      const body = await call('/investigations');
+      const match = (body.investigations || []).find(
+        (row: InvestigationStatus & { hostname: string }) => !wanted || row.hostname === wanted,
+      );
+      if (!match) throw new Error(`No investigation on file for ${wanted || 'this tenant'}`);
+      setStatus(match);
+      setReport(null);
+      setDispositions({});
+      return match;
+    });
+  const loadReport = () =>
+    onRun(async () => {
+      const body: InvestigationReport = await call(`/investigations/${id}/report`);
+      setReport(body);
+      setSummary(body.analystSummary || '');
+      setDispositions({});
+      return `Report for ${body.id}: ${body.facts.length} facts, ${body.findings.length} findings, ${body.gaps.length} gaps. Rendered above.`;
+    });
+  const saveNotes = () =>
+    onRun(async () => {
+      const body = await call(`/investigations/${id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ summary, dispositions }),
+      });
+      const fresh: InvestigationReport = await call(`/investigations/${id}/report`);
+      setReport(fresh);
+      setDispositions({});
+      return body;
+    });
+  const dispositionOf = (finding: InvestigationReport['findings'][number]) =>
+    dispositions[finding.key] || finding.disposition;
+
+  return (
+    <section id="investigation">
+      <h2>Investigation</h2>
+      <p>
+        One root scan, then pivots to the organisation&apos;s own hosts under the same registrable
+        domain, prioritised the way an analyst would open them: remote access, mail, identity,
+        administration, pre-production. Results under 24 hours old are reused. Hosts on other
+        domains are listed as related and are not scanned. The dossier marks each fact with a
+        confidence drawn from independent host and source pairs, and lists what the public record
+        did not answer.
+      </p>
+      <label>
+        Host cap for this investigation (1 to 12)
+        <input value={maxHosts} onChange={(event) => setMaxHosts(event.target.value)} />
+      </label>
+      <button type="button" onClick={start}>
+        Start investigation
+      </button>
+      <button type="button" onClick={loadLatest}>
+        Load latest for target
+      </button>
+      <button type="button" onClick={refresh} disabled={!id}>
+        Refresh status
+      </button>
+      <button type="button" onClick={loadReport} disabled={status?.status !== 'complete'}>
+        Load dossier
+      </button>
+      <button
+        type="button"
+        disabled={status?.status !== 'complete'}
+        onClick={() =>
+          onRun(() =>
+            downloadFile(
+              apiKey,
+              `/investigations/${id}/report.pdf`,
+              `cormorant-investigation-${status?.domain || 'report'}.pdf`,
+            ),
+          )
+        }
+      >
+        Download PDF
+      </button>
+      {status && (
+        <>
+          <p>
+            <strong>{status.status}</strong> · stage {status.stage} · {status.progress.complete} of{' '}
+            {status.progress.total} host scan(s) finished
+            {status.error ? ` · ${status.error}` : ''}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Host</th>
+                <th>Status</th>
+                <th>Risk</th>
+                <th>Reused</th>
+              </tr>
+            </thead>
+            <tbody>
+              {status.hosts.map((row) => (
+                <tr key={row.scanId}>
+                  <td>{row.host}</td>
+                  <td>{row.status}</td>
+                  <td>{row.risk ?? '—'}</td>
+                  <td>{row.reused ? 'yes' : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {status.held.length > 0 && (
+            <p className="muted">Held by the cap: {status.held.join(', ')}</p>
+          )}
+          {status.related.length > 0 && (
+            <p className="muted">
+              Related, not scanned: {status.related.map((row) => row.host).join(', ')}
+            </p>
+          )}
+          <ul className="muted">
+            {status.log.map((entry, index) => (
+              <li key={`${entry.at}-${index}`}>
+                {entry.at} · {entry.line}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {report && (
+        <>
+          <h3>
+            Organisation risk{' '}
+            {report.risk.score == null ? 'n/a' : `${report.risk.score} (${report.risk.letter})`}
+          </h3>
+          <p className="muted">
+            Weakest host {report.risk.min ?? 'n/a'}, mean {report.risk.mean ?? 'n/a'}.{' '}
+            {report.coverage.scanned} of {report.coverage.requested} host(s) scanned,{' '}
+            {report.coverage.reused} reused, {report.coverage.failed} failed.
+          </p>
+          <h3>Analyst summary</h3>
+          <textarea
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            rows={4}
+            placeholder="Write the client-facing summary here. Saved with the dispositions."
+          />
+          <h3>Collection narrative</h3>
+          <ul>
+            {report.narrative.map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ul>
+          <h3>Findings ({report.findings.length})</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Points</th>
+                <th>Host</th>
+                <th>Finding</th>
+                <th>Disposition</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.findings.map((finding) => (
+                <tr key={finding.key}>
+                  <td>-{finding.points}</td>
+                  <td>
+                    {finding.host}
+                    {finding.scope === 'domain' && (
+                      <div className="muted">domain · seen from {finding.hosts.join(', ')}</div>
+                    )}
+                  </td>
+                  <td>
+                    <strong>{finding.source}</strong> {finding.detail}
+                    {finding.action && <div className="muted">{finding.action}</div>}
+                  </td>
+                  <td>
+                    <select
+                      value={dispositionOf(finding)}
+                      onChange={(event) =>
+                        setDispositions({
+                          ...dispositions,
+                          [finding.key]: event.target.value as Disposition,
+                        })
+                      }
+                    >
+                      <option value="open">open</option>
+                      <option value="accepted">accepted</option>
+                      <option value="false-positive">false positive</option>
+                      <option value="fixed">fixed</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" onClick={saveNotes}>
+            Save summary and dispositions
+          </button>
+          <h3>Facts ({report.facts.length})</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Confidence</th>
+                <th>Kind</th>
+                <th>Value</th>
+                <th>Sources</th>
+                <th>Hosts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.facts.map((fact) => (
+                <tr key={`${fact.kind}:${fact.value}`}>
+                  <td>{fact.confidence}</td>
+                  <td>{fact.kind}</td>
+                  <td>
+                    {fact.value}
+                    {fact.severity ? ` (${fact.severity})` : ''}
+                    {fact.detail && <div className="muted">{fact.detail}</div>}
+                  </td>
+                  <td>{fact.sources.join(', ')}</td>
+                  <td>{fact.hosts.join(', ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <h3>Intelligence gaps ({report.gaps.length})</h3>
+          <ul>
+            {report.gaps.map((gap) => (
+              <li key={gap.gap}>
+                <strong>{gap.gap}</strong> — {gap.why}{' '}
+                <span className="muted">Next: {gap.next}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted">{report.note}</p>
+        </>
+      )}
+    </section>
   );
 };
 
@@ -284,34 +653,10 @@ const Offline = ({
 }) => {
   const [removeLocal, setRemoveLocal] = useState(true);
   const download = () =>
-    onRun(async () => {
-      const headers = new Headers();
-      if (apiKey) headers.set('x-api-key', apiKey);
-      const response = await fetch(`${deskApi()}/export.zip`, { headers });
-      if (!response.ok) {
-        const text = await response.text();
-        let message = text;
-        try {
-          message = JSON.parse(text).error || message;
-        } catch {
-          message = text;
-        }
-        throw new Error(message || `HTTP ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'cormorant-offline.zip';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-      return {
-        downloaded: anchor.download,
-        note: 'Save the zip onto the USB or external drive. This server still has the copy until a drive export with removal finishes.',
-      };
-    });
+    onRun(async () => ({
+      downloaded: await downloadFile(apiKey, '/export.zip', 'cormorant-offline.zip'),
+      note: 'Save the zip onto the USB or external drive. This server still has the copy until a drive export with removal finishes.',
+    }));
   return (
     <section id="offline">
       <h2>Offline copy</h2>

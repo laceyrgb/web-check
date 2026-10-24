@@ -17,6 +17,19 @@ Use this with a client who knows the work is happening. Passive modules read pub
 11. On `/desk`, choose the target and use Load history. That view only reads `GET /api/v1/history` for the signed-in tenant.
 12. When the assessment should leave the web server, mount the USB or external drive, set `WEBCHECK_EXPORT_DIR`, and use Save to external drive with removal checked. Take the drive. The folder's `index.html` is the offline report. A zip download is for a drive attached to the workstation and does not remove the server copy by itself.
 
+## Investigation
+
+Use this when the client wants the organisation covered, not one host. It is the passive recon above run across the organisation's own footprint without an operator choosing each pivot.
+
+1. On `/desk`, set the target, choose the host cap (12 by default), and use Start investigation. The root scan runs first. Refresh status shows the stage, the hosts table, and the log line for every pivot with the reason it was chosen. Pivots stay under the same registrable domain. A `related` host on another domain is written down and left alone until the client confirms scope in writing.
+2. Wait for `complete`, then Load dossier. Read the organisation risk first. It is weighted toward the weakest host, so one exposed pre-production host pulls the whole organisation down. The per-host list says which one.
+3. Read the findings from the top. Set a disposition on each: `accepted` when the client has signed off on the exposure, `false-positive` when you have checked the source and it is wrong, `fixed` when a rescan confirms the change. Leave the rest `open`. Write the client-facing summary in the field above and use Save summary and dispositions. Both are stored on the investigation and are applied to the next report and PDF without a rescan.
+4. Read the facts by confidence. `high` has three independent sources behind it; a domain-level lookup repeated from three hosts is still one source. A domain-level finding such as a lookalike or a missing DMARC record appears once, with the hosts that reported it. `low` facts, and every person name that is not also on the organisation's own pages, go in the report as unconfirmed. Do not send a `low` name to a search site.
+5. Read the intelligence gaps last. Each names what the public record did not answer and the next legal step: a held host for a second investigation, a related domain that needs written scope, a module that returned nothing and should be rerun, or a contact page to read by hand.
+6. Download PDF for the client. The analyst summary leads when one is saved; the narrative follows. The gaps are in the PDF so the client knows what was not covered.
+
+A second investigation on a held host is a new root. Results under 24 hours old are reused across investigations in the same tenant, so repeating one is cheap.
+
 ## Monitoring
 
 Create a monitor with an interval of at least 15 minutes. The first run is the baseline and does not alert. Later runs record a new hostname, certificate name, certificate fingerprint, CVE, open service, leak link, or live lookalike, plus DNS changes, a lower risk score, or a posture drop of more than five points.
