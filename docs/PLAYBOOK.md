@@ -4,7 +4,7 @@ Use this with a client who knows the work is happening. Passive modules read pub
 
 ## Passive recon
 
-1. Start a scan from `/desk` or `POST /api/v1/scans`.
+1. Start a scan from `/desk` or `POST /api/v1/scans`. To run a pile of links, paste them under Link list, or use Harvest this page. The desk keeps one host once and skips hosts this tenant already queued or finished. Read `alreadyScanned` before assuming a name was missed. Harvest reads the requested page and public subdomain names. It does not walk every link it finds.
 2. Read the attack-surface card for hostnames, common ports, and disclosed technologies. Citations name the index that supplied each host.
 3. Read known CVEs only where a version was disclosed. Skipped products say why.
 4. Read network exposure for GeoIP, ASN, reverse DNS, and same-IP neighbors. Shodan and Censys appear only when their keys are configured.

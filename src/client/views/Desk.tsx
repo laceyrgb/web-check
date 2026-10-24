@@ -172,9 +172,9 @@ const Desk = (): JSX.Element => {
         >
           Assets
         </button>
-        <Bulk onRun={run} call={call} />
         <Monitor onRun={run} call={call} target={target} />
       </section>
+      <Links target={target} onRun={run} call={call} />
       <History target={target} onRun={run} call={call} />
       <Records target={target} onRun={run} call={call} />
       <Offline apiKey={apiKey} onRun={run} call={call} />
@@ -186,32 +186,51 @@ const Desk = (): JSX.Element => {
   );
 };
 
-const Bulk = ({
+const Links = ({
+  target,
   onRun,
   call,
 }: {
+  target: string;
   onRun: (work: () => Promise<unknown>) => void;
   call: (path: string, init?: RequestInit) => Promise<any>;
 }) => {
-  const [domains, setDomains] = useState('');
+  const [text, setText] = useState('');
+  const send = (harvest: boolean) =>
+    onRun(() =>
+      call('/links', {
+        method: 'POST',
+        body: JSON.stringify({
+          text,
+          target: harvest ? target : undefined,
+          queue: true,
+        }),
+      }),
+    );
   return (
-    <label>
-      Bulk domains, one per line
-      <textarea value={domains} onChange={(event) => setDomains(event.target.value)} rows={3} />
-      <button
-        type="button"
-        onClick={() =>
-          onRun(() =>
-            call('/bulk', {
-              method: 'POST',
-              body: JSON.stringify({ domains: domains.split(/\s+/).filter(Boolean) }),
-            }),
-          )
-        }
-      >
-        Queue bulk
+    <section>
+      <h2>Link list</h2>
+      <p>
+        Paste a dump, one link or host per line. The same host is kept once. Hosts this tenant
+        already queued or finished are named and skipped. Harvest reads the links on the target page
+        and its public subdomains, then queues the new hosts.
+      </p>
+      <label>
+        Pasted links
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          rows={5}
+          placeholder="https://example.com/docs"
+        />
+      </label>
+      <button type="button" onClick={() => send(false)}>
+        Queue pasted links
       </button>
-    </label>
+      <button type="button" onClick={() => send(true)}>
+        Harvest this page
+      </button>
+    </section>
   );
 };
 

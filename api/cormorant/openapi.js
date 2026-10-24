@@ -11,7 +11,14 @@ export const openapi = {
     '/api/v1/scans/{id}': { get: { summary: 'Poll scan status' } },
     '/api/v1/scans/{id}/results': { get: { summary: 'Fetch completed results' } },
     '/api/v1/scans/{id}/report.pdf': { get: { summary: 'Download the Cormorant PDF' } },
-    '/api/v1/bulk': { post: { summary: 'Queue a list of domains' } },
+    '/api/v1/bulk': {
+      post: { summary: 'Queue unique hosts from a list, skipping ones already scanned' },
+    },
+    '/api/v1/links': {
+      post: {
+        summary: 'Harvest links from a page or a pasted dump, then queue the new hosts',
+      },
+    },
     '/api/v1/monitors': {
       get: { summary: 'List monitors' },
       post: { summary: 'Create an interval monitor' },

@@ -51,6 +51,10 @@ Unknown product versions are not sent to NVD. Shodan and Censys are lookups of a
 
 It does not run Nmap, Nuclei, an authenticated crawl, or anything that tries passwords.
 
+## Link list
+
+`POST /api/v1/links` takes a pasted dump, a page, or both. Pasted lines and the links on that one page are grouped by host. Repeated paths on the same host collapse. Hosts this tenant already queued or completed are listed under `alreadyScanned` and skipped. Failed hosts are queued again. Public subdomain names for the harvested page are included. The harvest does not fetch the other links it found. At most 80 new hosts are queued; further unique hosts are returned as `held` so a second pass can take the next batch. `/desk` has Queue pasted links and Harvest this page.
+
 ## Owner dossier
 
 After the first pass, the scan keeps going while new public identifiers appear, for up to three rounds and twelve lookups. A phone or copyright name on the page is enough to check domain RDAP, `security.txt`, SPF, and DMARC. An email those records add is then checked in the breach index, on Gravatar, and on the public OpenPGP keyserver. A registrant email on a different domain gets one RDAP lookup for the organization name. That domain is not scanned.

@@ -20,6 +20,7 @@ import {
 } from './util.js';
 import { invoke, targetUrl } from './hosts.js';
 import { collectPublicRecords } from './records.js';
+import { classifyHosts, collectLinkDump } from './links.js';
 import { assertNmapAuthorized, nmapAvailable, parseNmapXml, resolveSingleIp } from './nmap.js';
 import {
   assertEngagement,
@@ -332,30 +333,66 @@ export const createRouter = ({
     return res.send(pdf);
   };
 
-  router.post(
-    '/bulk',
-    wrap(async (req, res) => {
-      const domains = [...new Set((req.body?.domains || []).map((item) => hostFrom(item)))].slice(
-        0,
-        20,
-      );
-      if (!domains.length) return res.status(400).json({ error: 'Provide a domains array' });
-      const bulk = store.createBulk(domains, tenantOf(req));
-      const scanIds = domains.map((hostname) => {
-        const scan = store.createScan({
-          target: `https://${hostname}`,
-          hostname,
-          tenant: tenantOf(req),
-          bulkId: bulk.id,
-          publicUrls: [],
-        });
-        scans.push(scan.id);
-        return scan.id;
+  const priorScans = (tenant) => {
+    const rank = { complete: 3, running: 2, queued: 2, failed: 0 };
+    const map = new Map();
+    for (const scan of store.listScans(tenant)) {
+      const prev = map.get(scan.hostname);
+      if (!prev || (rank[scan.status] || 0) > (rank[prev.status] || 0))
+        map.set(scan.hostname, { id: scan.id, status: scan.status });
+    }
+    return map;
+  };
+  const startBulk = (hosts, tenant) => {
+    if (!hosts.length) return null;
+    const bulk = store.createBulk(hosts, tenant);
+    const scanIds = hosts.map((hostname) => {
+      const scan = store.createScan({
+        target: `https://${hostname}`,
+        hostname,
+        tenant,
+        bulkId: bulk.id,
+        publicUrls: [],
       });
-      store.updateBulk(bulk.id, { scanIds, status: 'running' });
-      return res.status(202).json(store.getBulk(bulk.id));
-    }),
-  );
+      scans.push(scan.id);
+      return scan.id;
+    });
+    store.updateBulk(bulk.id, { scanIds, status: 'running' });
+    return store.getBulk(bulk.id);
+  };
+  const planLinks = async (body, tenant) => {
+    const text = Array.isArray(body?.domains)
+      ? body.domains.join('\n')
+      : String(body?.text || body?.domains || '');
+    const target = body?.target ? hostFrom(body.target) : null;
+    if (!text.trim() && !target)
+      throw httpError(400, 'Paste a link list or name a page to harvest');
+    if (target) assertPublicTarget(target);
+    const dump = await collectLinkDump(
+      { text, target, includeSubdomains: body?.includeSubdomains !== false },
+      {},
+    );
+    const plan = classifyHosts(dump.parsed, priorScans(tenant));
+    const bulk = body?.queue === false ? null : startBulk(plan.queued, tenant);
+    return {
+      pageStatus: dump.pageStatus,
+      note: dump.note,
+      ...plan,
+      bulkId: bulk?.id || null,
+      bulk,
+    };
+  };
+  const respondLinks = async (req, res) => {
+    try {
+      const plan = await planLinks(req.body || {}, tenantOf(req));
+      const status = plan.bulk ? 202 : 200;
+      return res.status(status).json({ ...plan, bulk: undefined });
+    } catch (error) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  };
+  router.post('/bulk', wrap(respondLinks));
+  router.post('/links', wrap(respondLinks));
   router.get('/bulk/:id', (req, res) => {
     const bulk = store.getBulk(req.params.id, tenantOf(req));
     if (!bulk) return res.status(404).json({ error: 'Bulk job not found' });

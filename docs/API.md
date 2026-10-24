@@ -64,15 +64,15 @@ curl -s 'localhost:3000/api/v1/records?target=example.com'
 
 It reads SPF, DMARC, TLS-RPT, BIMI, MTA-STS, and five published DKIM selectors. It fetches at most three PDF or DOCX links from the page when they stay on the registrable domain. It reads crt.sh for issuers and upcoming expirations. A DNS error is reported on that lookup and is not scored as a missing policy. Document authors are not used as search terms.
 
-Bulk, up to 20 hosts:
+Bulk accepts a pasted dump or a `domains` array. Links are grouped by host. A host this tenant already queued or completed is returned under `alreadyScanned` and is not queued again. A failed host is queued again and listed under `retried`. At most 80 new hosts start in one request; the rest are `held`. `POST /api/v1/links` is the same planner and can also harvest one page.
 
 ```bash
-curl -s -X POST localhost:3000/api/v1/bulk \
+curl -s -X POST localhost:3000/api/v1/links \
   -H 'content-type: application/json' \
-  -d '{"domains":["example.com","example.org"]}'
+  -d '{"text":"https://example.com/docs\nhttps://example.com/about\nhttps://example.org","target":"example.com"}'
 ```
 
-Poll `GET /api/v1/bulk/:id`.
+`target` fetches that page, keeps the http(s) links on it, and adds public subdomain names. It does not crawl onward from those links. Poll `GET /api/v1/bulk/:id` when the response includes `bulkId`.
 
 ## Monitoring, timeline, inventory
 
