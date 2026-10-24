@@ -36,18 +36,18 @@ When no key is set, the API stays open and every record uses `default`. That is 
 
 These modules call the real API when the key is present and skip or fall back when it is unset. The key is not copied into errors or results.
 
-| Variable | When set | When unset |
-| --- | --- | --- |
-| `HIBP_API_KEY` | Have I Been Pwned breached-account lookup | Public XposedOrNot index |
-| `NVD_API_KEY` | NVD CPE match with the higher quota | Same CPE match, slower, still capped at three products |
-| `SHODAN_API_KEY` | Read-only Shodan host lookup | Skipped. InternetDB still runs and does not need a key |
-| `CENSYS_API_TOKEN` | Read-only Censys Platform host lookup | Falls back to `CENSYS_API_ID` plus `CENSYS_API_SECRET`, then skipped |
+| Variable           | When set                                  | When unset                                                           |
+| ------------------ | ----------------------------------------- | -------------------------------------------------------------------- |
+| `HIBP_API_KEY`     | Have I Been Pwned breached-account lookup | Public XposedOrNot index                                             |
+| `NVD_API_KEY`      | NVD CPE match with the higher quota       | Same CPE match, slower, still capped at three products               |
+| `SHODAN_API_KEY`   | Read-only Shodan host lookup              | Skipped. InternetDB still runs and does not need a key               |
+| `CENSYS_API_TOKEN` | Read-only Censys Platform host lookup     | Falls back to `CENSYS_API_ID` plus `CENSYS_API_SECRET`, then skipped |
 
 Unknown product versions are not sent to NVD. Shodan and Censys are lookups of an address the scan already resolved. They do not submit a scan.
 
 ## What a plain scan does
 
-`POST /api/v1/scans` collects public data only: certificate transparency hostnames, common-port observations, disclosed technologies, NVD matches, public breach indexes, GeoIP and RDAP, reverse DNS and same-IP neighbors, optional Shodan or Censys host lookups, public paste and code-index links, lookalikes, news mentions, header and TLS posture, CMS version clues, public bucket URLs already in the HTML, and public profile links. It then writes a risk score, a diff against the previous snapshot, and an asset inventory.
+`POST /api/v1/scans` collects public data only: certificate transparency hostnames, common-port observations, disclosed technologies, NVD matches, public breach indexes, GeoIP and RDAP, reverse DNS and same-IP neighbors, optional Shodan or Censys host lookups, public paste and code-index links, lookalikes (including `.ae` and a few Cyrillic homoglyphs), news mentions, header and TLS posture, CMS version clues, public bucket URLs already in the HTML, public profile links, and the public record of mail policy, linked documents, and certificate expirations. It then writes a risk score, a diff against the previous snapshot, and an asset inventory.
 
 It does not run Nmap, Nuclei, an authenticated crawl, or anything that tries passwords.
 
@@ -56,6 +56,18 @@ It does not run Nmap, Nuclei, an authenticated crawl, or anything that tries pas
 After the first pass, the scan keeps going while new public identifiers appear, for up to three rounds and twelve lookups. A phone or copyright name on the page is enough to check domain RDAP, `security.txt`, SPF, and DMARC. An email those records add is then checked in the breach index, on Gravatar, and on the public OpenPGP keyserver. A registrant email on a different domain gets one RDAP lookup for the organization name. That domain is not scanned.
 
 A person name that comes back is compared with the target page. It is not sent to a people-search site. Redacted WHOIS addresses are ignored. The PDF section is "Owner dossier", and the new emails and the organization are part of the executive summary and the asset inventory.
+
+## Public record
+
+A plain scan also reads what the organization has already published around the site. `records` on the result, the PDF section "Public record", and `GET /api/v1/records?target=` carry the same three parts.
+
+Mail policy comes from DNS: SPF, DMARC (`p` and `pct`), TLS-RPT, BIMI, and MTA-STS when `_mta-sts` is published. DKIM is limited to the provider selectors `google`, `selector1`, `selector2`, `k1`, and `zoho`. The key material is not stored. A missing selector is not treated as proof that DKIM is absent. A DNS failure is not scored as a missing record.
+
+Published files are PDF and Word documents already linked on the fetched page, on the same registrable domain, at most three, and at most 1.5 MB each. Author, creator, company, and a local user path are kept for the report. Those names are not sent to a people-search site. Links on other domains are not fetched.
+
+Certificate rows come from the public crt.sh log: issuers, names under the domain, and certificates that expire within 30 days. Historical expired certificates are not findings.
+
+Risk points apply to missing SPF, SPF `+all`, missing DMARC, DMARC `p=none`, a partial DMARC percentage, a logged certificate expiring within 14 days, and a local user path inside a published file. MTA-STS, BIMI, and TLS-RPT are reported and are not scored. Lookalikes now also include `name.ae`, `name.com.ae`, and one Cyrillic homoglyph per matching letter, still checked with DNS only.
 
 ## Authorized extras
 

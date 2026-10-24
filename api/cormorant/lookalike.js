@@ -1,13 +1,17 @@
 import dns from 'dns/promises';
+import { domainToASCII } from 'node:url';
 import { httpGet } from '../_common/http.js';
 import { canonicalHost, domainOf, cardFields } from './util.js';
 import { targetUrl } from './hosts.js';
 
 const HOMO = { o: ['0'], i: ['1'], l: ['1'], e: ['3'], a: ['4'], s: ['5'] };
 const ALT_TLD = { com: ['net', 'co'], net: ['com'], org: ['com'], co: ['com'] };
+const CYRILLIC = { a: 'а', e: 'е', o: 'о', p: 'р', c: 'с', y: 'у', x: 'х' };
 
 export const generateLookalikes = (domain) => {
-  const [label, ...rest] = String(domain || '').toLowerCase().split('.');
+  const [label, ...rest] = String(domain || '')
+    .toLowerCase()
+    .split('.');
   const tld = rest.join('.');
   if (!label || label.length < 4 || !tld) return [];
   const candidates = new Set();
@@ -24,7 +28,23 @@ export const generateLookalikes = (domain) => {
     for (const swap of HOMO[label[i]] || []) add(label.slice(0, i) + swap + label.slice(i + 1));
   }
   for (const alt of ALT_TLD[tld] || []) add(label, alt);
-  return [...candidates].slice(0, 24);
+  const reserved = [];
+  if (tld !== 'ae' && !tld.endsWith('.ae')) {
+    reserved.push(`${label}.ae`, `${label}.com.ae`);
+  }
+  for (const [latin, cyrillic] of Object.entries(CYRILLIC)) {
+    const at = label.indexOf(latin);
+    if (at < 0) continue;
+    const swapped = `${label.slice(0, at)}${cyrillic}${label.slice(at + 1)}.${tld}`;
+    try {
+      const ascii = domainToASCII(swapped);
+      if (ascii && ascii.startsWith('xn--') && ascii !== `${label}.${tld}`) reserved.push(ascii);
+    } catch {
+      continue;
+    }
+    if (reserved.length >= 6) break;
+  }
+  return [...new Set([...reserved, ...candidates])].slice(0, 28);
 };
 
 const resolves = async (host) => {
@@ -47,7 +67,12 @@ export const checkLookalikes = async (url, deps = {}) => {
     const rows = await Promise.all(
       group.map(async (host) => {
         const addresses = deps.resolveHost ? await deps.resolveHost(host) : await resolves(host);
-        return { domain: host, addresses, resolves: addresses.length > 0, suspicious: addresses.length > 0 };
+        return {
+          domain: host,
+          addresses,
+          resolves: addresses.length > 0,
+          suspicious: addresses.length > 0,
+        };
       }),
     );
     checked.push(...rows);
@@ -56,7 +81,10 @@ export const checkLookalikes = async (url, deps = {}) => {
   const http = deps.httpGet || httpGet;
   for (const row of live) {
     try {
-      const response = await http(targetUrl(row.domain), { timeout: 4000, validateStatus: () => true });
+      const response = await http(targetUrl(row.domain), {
+        timeout: 4000,
+        validateStatus: () => true,
+      });
       row.httpStatus = response.status;
     } catch {
       row.httpStatus = null;

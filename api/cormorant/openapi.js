@@ -17,6 +17,11 @@ export const openapi = {
       post: { summary: 'Create an interval monitor' },
     },
     '/api/v1/timeline': { get: { summary: 'Scan snapshots and diffs for a target' } },
+    '/api/v1/records': {
+      get: {
+        summary: 'Passive mail policy, linked-file metadata, and certificate log for one domain',
+      },
+    },
     '/api/v1/history': {
       get: { summary: 'Read-only per-target scan history, risk trend, and latest findings' },
     },

@@ -41,5 +41,11 @@ export const updateInventory = (prev, scan, seenAt) => {
   }
   if (scan.dossier?.organization?.name)
     touch('org', scan.dossier.organization.name, scan.dossier.organization.source);
+  for (const doc of scan.records?.documents || []) {
+    if (doc.author) touch('document-author', doc.author, 'published-file');
+    for (const email of doc.emails || []) touch('email', email, 'published-file');
+  }
+  for (const name of scan.records?.certificates?.names || [])
+    touch('host', name, 'certificate-log');
   return next;
 };

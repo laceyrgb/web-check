@@ -10,8 +10,16 @@ import { createQueue, startScheduler } from './queue.js';
 import { executeScan as defaultExecute } from './scan.js';
 import { summarizeScan, diffScans, prioritizeRemediations } from './risk.js';
 import { updateInventory } from './inventory.js';
-import { blockedInfrastructure, canonicalHost, flagOn, httpError, robotsAllows } from './util.js';
-import { invoke } from './hosts.js';
+import {
+  assertPublicTarget,
+  blockedInfrastructure,
+  canonicalHost,
+  flagOn,
+  httpError,
+  robotsAllows,
+} from './util.js';
+import { invoke, targetUrl } from './hosts.js';
+import { collectPublicRecords } from './records.js';
 import { assertNmapAuthorized, nmapAvailable, parseNmapXml, resolveSingleIp } from './nmap.js';
 import {
   assertEngagement,
@@ -421,6 +429,19 @@ export const createRouter = ({
     return res.status(202).json(publicScan(scan));
   });
 
+  router.get(
+    '/records',
+    wrap(async (req, res) => {
+      try {
+        const hostname = hostFrom(req.query.target);
+        assertPublicTarget(hostname);
+        const record = await collectPublicRecords({ href: targetUrl(hostname) });
+        return res.json(record);
+      } catch (error) {
+        return res.status(error.status || 500).json({ error: error.message });
+      }
+    }),
+  );
   router.get(
     '/timeline',
     wrap(async (req, res) => {

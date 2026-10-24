@@ -12,9 +12,10 @@ Use this with a client who knows the work is happening. Passive modules read pub
 6. Read lookalikes that resolve and decide, as a person, whether they matter.
 7. Read the posture letter and the remediation lines. They are configuration advice.
 8. Read the owner dossier. It starts from whatever the first pass actually found. A published phone can lead to an email in `security.txt` or RDAP, and that email can lead to a breach record, a Gravatar name, or a public key. The progression lines state which source added each fact. A name is kept when it appears on the target page or in those public profiles. It is not used to search for a private individual.
-9. Download the PDF from the results page or `GET /api/v1/scans/:id/report.pdf`. Read the executive summary, then the remediation list from the top, then the risk trend, then the owner dossier.
-10. On `/desk`, choose the target and use Load history. That view only reads `GET /api/v1/history` for the signed-in tenant.
-11. When the assessment should leave the web server, mount the USB or external drive, set `WEBCHECK_EXPORT_DIR`, and use Save to external drive with removal checked. Take the drive. The folder's `index.html` is the offline report. A zip download is for a drive attached to the workstation and does not remove the server copy by itself.
+9. Read the public record on the scan, or use Read public record on `/desk` (`GET /api/v1/records`). Check DMARC and SPF first. Then read authors and local paths in PDF or Word files the site already links. Then read certificate-log names and anything expiring within 30 days. `.ae` and `.com.ae` lookalikes are in the lookalike list with the ASCII ones.
+10. Download the PDF from the results page or `GET /api/v1/scans/:id/report.pdf`. Read the executive summary, then the remediation list from the top, then the risk trend, then the owner dossier and the public record.
+11. On `/desk`, choose the target and use Load history. That view only reads `GET /api/v1/history` for the signed-in tenant.
+12. When the assessment should leave the web server, mount the USB or external drive, set `WEBCHECK_EXPORT_DIR`, and use Save to external drive with removal checked. Take the drive. The folder's `index.html` is the offline report. A zip download is for a drive attached to the workstation and does not remove the server copy by itself.
 
 ## Monitoring
 

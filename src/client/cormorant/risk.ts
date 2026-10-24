@@ -33,6 +33,7 @@ export const scoreRisk = (report: any = {}): RiskScore => {
     'lookalikes',
     'mentions',
     'posture',
+    'records',
   ].some((key) => report[key] && !report[key].error);
   if (!observed) {
     return {
@@ -65,6 +66,8 @@ export const scoreRisk = (report: any = {}): RiskScore => {
     deduct(8, { source: 'lookalike', detail: host });
   for (const leak of report.mentions?.leaks || [])
     deduct(10, { source: 'leak-index', detail: leak.url });
+  for (const finding of report.records?.findings || [])
+    deduct(finding.points || 0, { source: finding.source || 'record', detail: finding.detail });
   for (const cve of report.cms?.cves || []) deduct(12, { source: 'cms', detail: cve.id });
   if ((report.posture?.score ?? 100) < 70) {
     deduct(Math.min(20, 100 - report.posture.score), {

@@ -16,6 +16,7 @@ import {
 } from './content.js';
 import { buildExecutiveSummary, scoreRisk } from './risk.js';
 import { buildDossier } from './dossier.js';
+import { collectPublicRecords } from './records.js';
 
 const sorted = (values) => [...(values || [])].map(String).sort();
 
@@ -44,16 +45,21 @@ export const executeScan = async (target, opts = {}) => {
   };
   const page = await guard('page', () => (deps.page ? deps.page : fetchPage(href, deps)));
   const pageOk = page && !page.error ? page : { headers: {}, html: '', status: null };
-  const [attackSurface, exposure, lookalikes, mentions, posture, dnsSnapshot] = await Promise.all([
-    guard('attackSurface', () =>
-      buildAttackSurface(href, { ...deps, page: pageOk, skipPorts: opts.skipPorts }),
-    ),
-    guard('exposure', () => networkExposure(href, deps)),
-    guard('lookalikes', () => checkLookalikes(href, deps)),
-    guard('mentions', () => publicMentions(href, deps)),
-    guard('posture', () => observePosture(href, { ...deps, page: pageOk })),
-    guard('dns', () => (deps.dns ? deps.dns : readDns(canonicalHost(href)))),
-  ]);
+  const domainHint = domainOf(canonicalHost(href));
+  const [attackSurface, exposure, lookalikes, mentions, posture, dnsSnapshot, records] =
+    await Promise.all([
+      guard('attackSurface', () =>
+        buildAttackSurface(href, { ...deps, page: pageOk, skipPorts: opts.skipPorts }),
+      ),
+      guard('exposure', () => networkExposure(href, deps)),
+      guard('lookalikes', () => checkLookalikes(href, deps)),
+      guard('mentions', () => publicMentions(href, deps)),
+      guard('posture', () => observePosture(href, { ...deps, page: pageOk })),
+      guard('dns', () => (deps.dns ? deps.dns : readDns(canonicalHost(href)))),
+      guard('records', () =>
+        collectPublicRecords({ html: pageOk.html || '', href, domain: domainHint }, deps),
+      ),
+    ]);
   const technologies = attackSurface?.technologies || [];
   const [cves, breaches, cms, buckets, people] = await Promise.all([
     guard('cves', () => lookupCves(technologies, deps)),
@@ -77,7 +83,7 @@ export const executeScan = async (target, opts = {}) => {
     }),
   ]);
   const privacy = auditPrivacy(pageOk.html || '', href, pageOk.headers || {});
-  const domain = attackSurface?.domain || domainOf(canonicalHost(href));
+  const domain = attackSurface?.domain || domainHint;
   const dossier = await guard('dossier', () =>
     buildDossier(
       {
@@ -119,6 +125,7 @@ export const executeScan = async (target, opts = {}) => {
     privacy,
     buckets,
     people,
+    records: records?.error ? { error: records.error } : records,
     dossier: dossier?.error ? { error: dossier.error } : dossier,
     dns: dnsSnapshot?.error ? null : dnsSnapshot,
     sectionErrors: errors,

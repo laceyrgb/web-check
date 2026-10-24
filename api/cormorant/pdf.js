@@ -120,6 +120,33 @@ export const renderReport = async (report) => {
         report.dossier.note,
       ]);
     }
+    if (report.records && !report.records.error) {
+      const mail = report.records.mail;
+      section(pdf, 'Public record', [
+        mail?.spf ? `SPF ${mail.spf.qualifier}: ${mail.spf.record}` : 'SPF was not published.',
+        mail?.dmarc
+          ? `DMARC p=${mail.dmarc.policy}${mail.dmarc.pct < 100 ? ` pct=${mail.dmarc.pct}` : ''}`
+          : 'DMARC was not published.',
+        mail?.dkim?.length
+          ? `DKIM selectors published: ${mail.dkim.map((row) => row.selector).join(', ')}`
+          : mail?.dkimNote,
+        mail?.mtaSts?.published
+          ? `MTA-STS mode: ${mail.mtaSts.mode || 'unknown'}`
+          : 'MTA-STS was not published.',
+        ...(mail?.notes || []),
+        ...(report.records.documents || []).map((doc) =>
+          `${doc.kind} ${doc.url} author ${doc.author || 'not named'} ${doc.paths?.length ? `path ${doc.paths.join(', ')}` : ''}`.trim(),
+        ),
+        report.records.certificates?.issuers?.length
+          ? `Certificate issuers: ${report.records.certificates.issuers.map((row) => `${row.name} (${row.count})`).join(', ')}`
+          : '',
+        report.records.certificates?.expiring?.length
+          ? `Expiring within 30 days: ${report.records.certificates.expiring.map((row) => row.notAfter).join(', ')}`
+          : 'No logged certificate expires within 30 days.',
+        (report.records.certificates?.names || []).slice(0, 15).join(', '),
+        report.records.note,
+      ]);
+    }
     if (report.exposure) {
       section(pdf, 'Network exposure', [
         report.exposure.ip ? `IP: ${report.exposure.ip}` : '',

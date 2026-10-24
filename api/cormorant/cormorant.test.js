@@ -105,7 +105,9 @@ test('breach records stay on the public allowlist', () => {
 test('lookalikes never include the real domain', () => {
   const names = generateLookalikes('example.com');
   assert.equal(names.includes('example.com'), false);
-  assert.ok(names.length > 0);
+  assert.ok(names.includes('example.ae'));
+  assert.ok(names.includes('example.com.ae'));
+  assert.ok(names.some((name) => name.startsWith('xn--')));
 });
 
 test('robots.txt star rules are the only ones enforced', () => {

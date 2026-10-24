@@ -176,6 +176,7 @@ const Desk = (): JSX.Element => {
         <Monitor onRun={run} call={call} target={target} />
       </section>
       <History target={target} onRun={run} call={call} />
+      <Records target={target} onRun={run} call={call} />
       <Offline apiKey={apiKey} onRun={run} call={call} />
       <Nmap onRun={run} call={call} target={target} />
       <Engagement onRun={run} call={call} />
@@ -322,6 +323,31 @@ const Offline = ({
     </section>
   );
 };
+
+const Records = ({
+  target,
+  onRun,
+  call,
+}: {
+  target: string;
+  onRun: (work: () => Promise<unknown>) => void;
+  call: (path: string, init?: RequestInit) => Promise<any>;
+}) => (
+  <section>
+    <h2>Public record</h2>
+    <p>
+      Mail policy, PDF and Word files already linked on the site, and the public certificate log.
+      Authors stay in the report. They are not looked up. DKIM uses only published provider
+      selectors.
+    </p>
+    <button
+      type="button"
+      onClick={() => onRun(() => call(`/records?target=${encodeURIComponent(target)}`))}
+    >
+      Read public record
+    </button>
+  </section>
+);
 
 const History = ({
   target,

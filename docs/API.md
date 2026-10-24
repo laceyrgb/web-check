@@ -12,31 +12,31 @@ When neither `WEBCHECK_API_KEY` nor `WEBCHECK_TENANT_KEYS` is set, routes are op
 
 ## Environment
 
-| Variable | Effect when unset |
-| --- | --- |
-| `WEBCHECK_API_KEY` | API is open unless `WEBCHECK_TENANT_KEYS` is set. This key is tenant `default` |
-| `WEBCHECK_TENANT_KEYS` | No extra tenants. Format `acme:secret,other:secret` |
-| `WEBCHECK_DATA_DIR` | Store files in `./.data` |
-| `WEBCHECK_EXPORT_DIR` | Drive export is refused. Download `/api/v1/export.zip` instead |
-| `WEBCHECK_SCAN_CONCURRENCY` | One scan at a time |
-| `WEBCHECK_DISABLE_SCHEDULER` | Monitor timer runs |
-| `HIBP_API_KEY` | Email checks use the public XposedOrNot index |
-| `NVD_API_KEY` | NVD is queried slowly and capped at three products |
-| `SHODAN_API_KEY` | Shodan host lookup is skipped. InternetDB still runs |
-| `CENSYS_API_TOKEN` | Censys is skipped unless `CENSYS_API_ID` and `CENSYS_API_SECRET` are both set |
-| `GITHUB_TOKEN` | GitHub code search is skipped. searchcode still runs |
-| `CERTSPOTTER_TOKEN` | Cert Spotter is queried anonymously |
-| `WEBCHECK_NMAP_ENABLED` | Nmap routes refuse |
-| `WEBCHECK_NMAP_CONCURRENCY` | One Nmap job |
-| `WEBCHECK_NMAP_TIMEOUT_MS` | 180000 |
-| `WEBCHECK_PENTEST_ENABLED` | Engagement routes refuse |
-| `WEBCHECK_NUCLEI_MAX_SEVERITY` | Nuclei severity cap is `medium` |
-| `WEBCHECK_SLACK_WEBHOOK_URL` | Slack alerts are skipped. `SLACK_WEBHOOK_URL` is an alias |
-| `WEBCHECK_ALERT_EMAIL_TO` | Email alerts are skipped |
-| `WEBCHECK_SMTP_HOST` | Email alerts are skipped even if a recipient is set |
-| `WEBCHECK_SMTP_PORT` | 587, which uses STARTTLS. Port 465 is implicit TLS |
-| `WEBCHECK_SMTP_USER` / `WEBCHECK_SMTP_PASS` | SMTP AUTH is skipped |
-| `WEBCHECK_ALERT_EMAIL_FROM` | From address is `cormorant@localhost` |
+| Variable                                    | Effect when unset                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `WEBCHECK_API_KEY`                          | API is open unless `WEBCHECK_TENANT_KEYS` is set. This key is tenant `default` |
+| `WEBCHECK_TENANT_KEYS`                      | No extra tenants. Format `acme:secret,other:secret`                            |
+| `WEBCHECK_DATA_DIR`                         | Store files in `./.data`                                                       |
+| `WEBCHECK_EXPORT_DIR`                       | Drive export is refused. Download `/api/v1/export.zip` instead                 |
+| `WEBCHECK_SCAN_CONCURRENCY`                 | One scan at a time                                                             |
+| `WEBCHECK_DISABLE_SCHEDULER`                | Monitor timer runs                                                             |
+| `HIBP_API_KEY`                              | Email checks use the public XposedOrNot index                                  |
+| `NVD_API_KEY`                               | NVD is queried slowly and capped at three products                             |
+| `SHODAN_API_KEY`                            | Shodan host lookup is skipped. InternetDB still runs                           |
+| `CENSYS_API_TOKEN`                          | Censys is skipped unless `CENSYS_API_ID` and `CENSYS_API_SECRET` are both set  |
+| `GITHUB_TOKEN`                              | GitHub code search is skipped. searchcode still runs                           |
+| `CERTSPOTTER_TOKEN`                         | Cert Spotter is queried anonymously                                            |
+| `WEBCHECK_NMAP_ENABLED`                     | Nmap routes refuse                                                             |
+| `WEBCHECK_NMAP_CONCURRENCY`                 | One Nmap job                                                                   |
+| `WEBCHECK_NMAP_TIMEOUT_MS`                  | 180000                                                                         |
+| `WEBCHECK_PENTEST_ENABLED`                  | Engagement routes refuse                                                       |
+| `WEBCHECK_NUCLEI_MAX_SEVERITY`              | Nuclei severity cap is `medium`                                                |
+| `WEBCHECK_SLACK_WEBHOOK_URL`                | Slack alerts are skipped. `SLACK_WEBHOOK_URL` is an alias                      |
+| `WEBCHECK_ALERT_EMAIL_TO`                   | Email alerts are skipped                                                       |
+| `WEBCHECK_SMTP_HOST`                        | Email alerts are skipped even if a recipient is set                            |
+| `WEBCHECK_SMTP_PORT`                        | 587, which uses STARTTLS. Port 465 is implicit TLS                             |
+| `WEBCHECK_SMTP_USER` / `WEBCHECK_SMTP_PASS` | SMTP AUTH is skipped                                                           |
+| `WEBCHECK_ALERT_EMAIL_FROM`                 | From address is `cormorant@localhost`                                          |
 
 Shodan and Censys calls are read-only host lookups. Errors do not include the key. Missing keys are reported as skipped, not as findings.
 
@@ -56,6 +56,14 @@ Results include `risk` (`score`, `letter`, `factors`), `history.changes`, `asset
 
 `dossier` is the owner pivot. `progression` is the order of public discoveries. `contacts`, `people`, `organization`, `mailProvider`, `publicKeys`, and `news` are only values a source actually returned. `emailsDiscovered` lists addresses that were not on the first page pass and were then breach-checked. `stopped` is `no-new-identifiers`, `round-cap`, or `lookup-cap`. The loop does not scan a newly seen domain and does not query a people-search site with a person name.
 
+`records` is the public record: `mail`, `documents`, `certificates`, and `findings`. The same payload is available without starting a scan:
+
+```bash
+curl -s 'localhost:3000/api/v1/records?target=example.com'
+```
+
+It reads SPF, DMARC, TLS-RPT, BIMI, MTA-STS, and five published DKIM selectors. It fetches at most three PDF or DOCX links from the page when they stay on the registrable domain. It reads crt.sh for issuers and upcoming expirations. A DNS error is reported on that lookup and is not scored as a missing policy. Document authors are not used as search terms.
+
 Bulk, up to 20 hosts:
 
 ```bash
@@ -74,7 +82,7 @@ curl -s -X POST localhost:3000/api/v1/monitors \
   -d '{"target":"example.com","everyMinutes":1440}'
 ```
 
-`everyMinutes` is 15 to 10080. `schedule` accepts `every:30m`, `every:12h`, or `every:1d`. Creating a monitor queues the first scan. Later runs are compared with the previous snapshot for that tenant. Recorded diff types: `new-subdomain`, `new-cert-name`, `cert-change`, `new-cve`, `new-open-service`, `new-leak-mention`, `new-lookalike`, `dns-change`, `risk-worse`, `posture-worse`. The first snapshot is a baseline and has no diffs.
+`everyMinutes` is 15 to 10080. `schedule` accepts `every:30m`, `every:12h`, or `every:1d`. Creating a monitor queues the first scan. Later runs are compared with the previous snapshot for that tenant. Recorded diff types: `new-subdomain`, `new-cert-name`, `cert-change`, `new-cve`, `new-open-service`, `new-leak-mention`, `new-lookalike`, `dns-change`, `mail-policy-change`, `risk-worse`, `posture-worse`. The first snapshot is a baseline and has no diffs.
 
 Slack and email are sent only for `risk-worse`, `new-subdomain`, `new-cert-name`, and `cert-change`. The monitor stores `alert` and `alertDelivery`. When no sink is configured, `alertDelivery.skipped` is `unconfigured` and nothing is sent.
 
@@ -95,7 +103,7 @@ Requires `WEBCHECK_EXPORT_DIR` to be the mount path of a USB stick or external d
 
 `GET /api/v1/export.zip` returns the same files as a zip and does not delete anything. Optional `?target=example.com` limits either call to one host. Passwords, API keys, and session cookies are omitted.
 
-`GET /api/v1/assets?target=example.com` returns deduped hosts, IPs, services, technologies, and published emails with `firstSeen` and `lastSeen`.
+`GET /api/v1/assets?target=example.com` returns deduped hosts, IPs, services, technologies, published emails, document authors, and certificate-log names with `firstSeen` and `lastSeen`.
 
 `GET /api/v1/monitors`, `DELETE /api/v1/monitors/:id`, `POST /api/v1/monitors/:id/run`.
 

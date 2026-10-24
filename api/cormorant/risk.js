@@ -18,6 +18,7 @@ export const scoreRisk = (report = {}) => {
     'lookalikes',
     'mentions',
     'posture',
+    'records',
   ].some((key) => report[key] && !report[key].error);
   if (!observed) {
     return {
@@ -55,6 +56,12 @@ export const scoreRisk = (report = {}) => {
     deduct(8, { source: 'lookalike', detail: host });
   for (const leak of report.mentions?.leaks || [])
     deduct(10, { source: 'leak-index', detail: leak.url });
+  for (const finding of report.records?.findings || [])
+    deduct(finding.points || 0, {
+      source: finding.source || 'record',
+      detail: finding.detail,
+      action: finding.action,
+    });
   for (const cve of report.cms?.cves || []) deduct(12, { source: 'cms', detail: cve.id });
   if ((report.posture?.score ?? 100) < 70) {
     deduct(Math.min(20, 100 - report.posture.score), {
@@ -115,6 +122,20 @@ export const buildExecutiveSummary = (report) => {
       `Later public pivots added ${report.dossier.emailsDiscovered.join(', ')}, which were not on the first page pass.`,
     );
   }
+  if (report.records?.mail && !report.records.mail.dmarcError) {
+    lines.push(
+      report.records.mail.dmarc
+        ? `DMARC policy is ${report.records.mail.dmarc.policy}.`
+        : 'No DMARC record was published.',
+    );
+  }
+  const authors = (report.records?.documents || []).map((doc) => doc.author).filter(Boolean);
+  if (authors.length) lines.push(`Published files name ${[...new Set(authors)].join(', ')}.`);
+  if (report.records?.certificates?.expiring?.length) {
+    lines.push(
+      `${report.records.certificates.expiring.length} logged certificate(s) expire within 30 days.`,
+    );
+  }
   if (report.risk?.score != null)
     lines.push(
       `Rolled-up risk score is ${report.risk.score} (${report.risk.letter}) from ${report.risk.factors.length} weighted factors.`,
@@ -126,6 +147,7 @@ export const buildExecutiveSummary = (report) => {
 };
 
 const remediationFor = (factor) => {
+  if (factor.action) return factor.action;
   switch (factor.source) {
     case 'cve':
       return `Review ${factor.id || factor.detail || 'the disclosed CVE'} and upgrade that version.`;
@@ -185,6 +207,9 @@ export const summarizeScan = (results) => ({
   leakUrls: (results.mentions?.leaks || []).map((item) => item.url),
   lookalikesLive: results.lookalikes?.live || [],
   dns: results.dns || null,
+  mailPolicy: results.records?.mail
+    ? `${results.records.mail.spf ? results.records.mail.spf.qualifier : 'no-spf'}:${results.records.mail.dmarc?.policy || 'no-dmarc'}`
+    : null,
 });
 
 export const diffScans = (prev, next) => {
@@ -201,6 +226,8 @@ export const diffScans = (prev, next) => {
   added('new-open-service', (prev.openPorts || []).map(String), (next.openPorts || []).map(String));
   added('new-leak-mention', prev.leakUrls, next.leakUrls);
   added('new-lookalike', prev.lookalikesLive, next.lookalikesLive);
+  if (prev.mailPolicy && next.mailPolicy && prev.mailPolicy !== next.mailPolicy)
+    changes.push({ type: 'mail-policy-change', value: `${prev.mailPolicy} -> ${next.mailPolicy}` });
   if (prev.dns && next.dns && JSON.stringify(prev.dns) !== JSON.stringify(next.dns)) {
     changes.push({ type: 'dns-change', value: 'DNS snapshot changed' });
   }
