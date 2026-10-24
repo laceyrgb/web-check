@@ -14,6 +14,10 @@ The UI is on port 4321 and the API on port 3001 during `yarn dev`. `yarn start` 
 
 Desk page: `/desk`. Result pages show a risk rollup and a PDF button. The PDF is generated on the server from a fresh scan, so the browser cannot invent findings.
 
+## Project map
+
+`/project` opens one host in the full report (`/check/<host>`), each category checker, and every desk section. The same links sit on the desk and on a finished report. Entering `https://example.com/docs` uses `example.com`, because a scan covers the host. The map does not start a scan.
+
 State is a JSON file under `WEBCHECK_DATA_DIR` (default `.data`). Engagement secrets live in a separate file with mode `0600` and are never returned by GET.
 
 ## Offline copy

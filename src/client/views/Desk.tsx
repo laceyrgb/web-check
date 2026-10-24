@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import styled from '@emotion/styled';
 import colors from 'client/styles/colors';
+import { ProjectMap } from 'client/components/ProjectMap';
 
 const Page = styled.div`
   width: min(94vw, 960px);
@@ -129,7 +130,11 @@ const Desk = (): JSX.Element => {
           />
         </label>
       </section>
-      <section>
+      <section id="project">
+        <h2>Project map</h2>
+        <ProjectMap target={target} here="desk" />
+      </section>
+      <section id="scan">
         <h2>Scan, timeline, inventory</h2>
         <button
           type="button"
@@ -208,7 +213,7 @@ const Links = ({
       }),
     );
   return (
-    <section>
+    <section id="links">
       <h2>Link list</h2>
       <p>
         Paste a dump, one link or host per line. The same host is kept once. Hosts this tenant
@@ -308,7 +313,7 @@ const Offline = ({
       };
     });
   return (
-    <section>
+    <section id="offline">
       <h2>Offline copy</h2>
       <p>
         Write this tenant&apos;s scans, dossiers, and PDFs to a USB stick or external drive. Open
@@ -352,7 +357,7 @@ const Records = ({
   onRun: (work: () => Promise<unknown>) => void;
   call: (path: string, init?: RequestInit) => Promise<any>;
 }) => (
-  <section>
+  <section id="records">
     <h2>Public record</h2>
     <p>
       Mail policy, PDF and Word files already linked on the site, and the public certificate log.
@@ -387,7 +392,7 @@ const History = ({
   const trend = Array.isArray(history?.trend) ? history.trend : [];
   const max = 100;
   return (
-    <section>
+    <section id="history">
       <h2>Target history</h2>
       <p>
         Read-only. Lists this tenant's scans, the risk score over time, and the latest findings.
@@ -455,7 +460,7 @@ const Nmap = ({
   const [acknowledged, setAcknowledged] = useState(false);
   const [profile, setProfile] = useState('default');
   return (
-    <section>
+    <section id="nmap">
       <h2>Authorized port scan</h2>
       <p>Requires a checkbox, the exact host, and WEBCHECK_NMAP_ENABLED. No exploit scripts.</p>
       <label>
@@ -519,7 +524,7 @@ const Engagement = ({
   const [confirm, setConfirm] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   return (
-    <section>
+    <section id="engagement">
       <h2>Pentest engagement</h2>
       <p>
         Nothing here runs unless WEBCHECK_PENTEST_ENABLED is set and the phrase matches. Password
@@ -603,7 +608,7 @@ const Audit = ({
     );
   };
   return (
-    <section>
+    <section id="audit">
       <h2>Mobile, SBOM, public people</h2>
       <label>
         Public store URL

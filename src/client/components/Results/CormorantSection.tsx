@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import styled from '@emotion/styled';
 import colors from 'client/styles/colors';
 import { riskFromJobs } from 'client/cormorant/risk';
+import { projectLinks } from 'client/cormorant/projectLinks.js';
 import type { JobsState } from 'client/jobs/types';
 
 const Panel = styled.section`
@@ -36,6 +37,26 @@ const Panel = styled.section`
     cursor: pointer;
     font: inherit;
   }
+  nav {
+    flex-basis: 100%;
+  }
+  nav a {
+    background: transparent;
+    color: ${colors.primaryIncreasedContrast};
+    padding: 0;
+  }
+  nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  nav h3 {
+    margin: 0.6rem 0 0;
+    font-size: 0.95rem;
+  }
 `;
 
 const deskApi = () => {
@@ -45,6 +66,7 @@ const deskApi = () => {
 
 const CormorantSection = (props: { address: string; jobs: JobsState }): JSX.Element => {
   const risk = useMemo(() => riskFromJobs(props.jobs), [props.jobs]);
+  const map = useMemo(() => projectLinks(props.address), [props.address]);
   const [message, setMessage] = useState('');
   const download = async () => {
     setMessage('Building the PDF from a fresh server-side scan.');
@@ -82,8 +104,23 @@ const CormorantSection = (props: { address: string; jobs: JobsState }): JSX.Elem
         <button type="button" onClick={download}>
           Download PDF
         </button>{' '}
-        <a href={`/desk?target=${encodeURIComponent(props.address)}`}>Open desk</a>
+        <a href={`/desk?target=${encodeURIComponent(map.host || props.address)}`}>Open desk</a>{' '}
+        <a href={`/project?target=${encodeURIComponent(map.host || props.address)}`}>Project map</a>
       </div>
+      <nav aria-label="This host in the project">
+        {map.groups.map((group) => (
+          <div key={group.id}>
+            <h3>{group.title}</h3>
+            <ul>
+              {group.links.map((link) => (
+                <li key={`${group.id}-${link.label}`}>
+                  <a href={link.href}>{link.label}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
     </Panel>
   );
 };

@@ -2,7 +2,7 @@
 
 Base path: `/api/v1`.
 
-Machine-readable index: `GET /api/v1/openapi.json`.
+Machine-readable index: `GET /api/v1/openapi.json`. The pages that call these routes are linked from `/project`.
 
 ## Authentication
 

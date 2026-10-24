@@ -38,6 +38,23 @@ if (redirectPath) return Astro.redirect(redirectPath);
     </header>
     <ScanForm label="Enter a URL" showCategories />
     <div>
+      <h2>Project</h2>
+      <ul>
+        <li>
+          <a href="/desk">OSINT desk</a>
+        </li>
+        <li>
+          <a href="/project">Project map</a>
+        </li>
+        <li>
+          <a href="/checks">What each check does</a>
+        </li>
+        <li>
+          <a href="/web-check-api">API</a>
+        </li>
+      </ul>
+    </div>
+    <div>
       <h2>Checks</h2>
       <ul>
         {checkIds.map((id) => (
