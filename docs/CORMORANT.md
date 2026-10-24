@@ -41,6 +41,12 @@ Unknown product versions are not sent to NVD. Shodan and Censys are lookups of a
 
 It does not run Nmap, Nuclei, an authenticated crawl, or anything that tries passwords.
 
+## Owner dossier
+
+After the first pass, the scan keeps going while new public identifiers appear, for up to three rounds and twelve lookups. A phone or copyright name on the page is enough to check domain RDAP, `security.txt`, SPF, and DMARC. An email those records add is then checked in the breach index, on Gravatar, and on the public OpenPGP keyserver. A registrant email on a different domain gets one RDAP lookup for the organization name. That domain is not scanned.
+
+A person name that comes back is compared with the target page. It is not sent to a people-search site. Redacted WHOIS addresses are ignored. The PDF section is "Owner dossier", and the new emails and the organization are part of the executive summary and the asset inventory.
+
 ## Authorized extras
 
 Nmap runs only after a person checks the authorization box, types the exact host, and `WEBCHECK_NMAP_ENABLED=true`. The host must resolve to one IP. Local and metadata addresses are refused. Flags are fixed profiles. None of them pass `-A`, `-O`, or `--script`.

@@ -11,8 +11,9 @@ Use this with a client who knows the work is happening. Passive modules read pub
 5. Read public mentions for news and code or paste-index links. Open the link. The desk does not store the paste.
 6. Read lookalikes that resolve and decide, as a person, whether they matter.
 7. Read the posture letter and the remediation lines. They are configuration advice.
-8. Download the PDF from the results page or `GET /api/v1/scans/:id/report.pdf`. Read the executive summary, then the remediation list from the top, then the risk trend.
-9. On `/desk`, choose the target and use Load history. That view only reads `GET /api/v1/history` for the signed-in tenant.
+8. Read the owner dossier. It starts from whatever the first pass actually found. A published phone can lead to an email in `security.txt` or RDAP, and that email can lead to a breach record, a Gravatar name, or a public key. The progression lines state which source added each fact. A name is kept when it appears on the target page or in those public profiles. It is not used to search for a private individual.
+9. Download the PDF from the results page or `GET /api/v1/scans/:id/report.pdf`. Read the executive summary, then the remediation list from the top, then the risk trend, then the owner dossier.
+10. On `/desk`, choose the target and use Load history. That view only reads `GET /api/v1/history` for the signed-in tenant.
 
 ## Monitoring
 

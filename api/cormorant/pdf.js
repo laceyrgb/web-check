@@ -98,6 +98,28 @@ export const renderReport = async (report) => {
           : [`${row.email}: ${row.status}`],
       ),
     );
+    if (report.dossier && !report.dossier.error) {
+      section(pdf, 'Owner dossier', [
+        report.dossier.organization
+          ? `Organization: ${report.dossier.organization.name} (${report.dossier.organization.source})`
+          : 'No public organization name was disclosed.',
+        report.dossier.mailProvider ? `Mail provider: ${report.dossier.mailProvider}` : '',
+        report.dossier.hostingOrg ? `Network org: ${report.dossier.hostingOrg}` : '',
+        ...(report.dossier.contacts || []).map(
+          (item) => `${item.kind}: ${item.value} (${item.source})`,
+        ),
+        ...(report.dossier.people || []).map(
+          (item) =>
+            `${item.name} [${item.confidence}] ${item.source}${item.onPage ? ' (also on the page)' : ''}`,
+        ),
+        ...(report.dossier.publicKeys || []).map(
+          (item) => `OpenPGP key published for ${item.email}`,
+        ),
+        ...(report.dossier.news || []).map((item) => `${item.title} ${item.url}`),
+        ...(report.dossier.progression || []),
+        report.dossier.note,
+      ]);
+    }
     if (report.exposure) {
       section(pdf, 'Network exposure', [
         report.exposure.ip ? `IP: ${report.exposure.ip}` : '',

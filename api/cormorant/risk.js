@@ -105,6 +105,16 @@ export const buildExecutiveSummary = (report) => {
     lines.push(`${breached.length} checked address(es) appeared in a public breach index.`);
   else if (report.breaches)
     lines.push('No checked address had a public breach record in the indexes that responded.');
+  if (report.dossier?.organization?.name) {
+    lines.push(
+      `Public owner records name ${report.dossier.organization.name} (${report.dossier.organization.source}).`,
+    );
+  }
+  if (report.dossier?.emailsDiscovered?.length) {
+    lines.push(
+      `Later public pivots added ${report.dossier.emailsDiscovered.join(', ')}, which were not on the first page pass.`,
+    );
+  }
   if (report.risk?.score != null)
     lines.push(
       `Rolled-up risk score is ${report.risk.score} (${report.risk.letter}) from ${report.risk.factors.length} weighted factors.`,

@@ -51,7 +51,9 @@ Response `202` with `{ "id", "status": "queued" }`. Poll `GET /api/v1/scans/:id`
 
 `GET /api/v1/scans/:id/report.pdf` returns the Cormorant PDF. `GET /api/v1/report.pdf?url=example.com` runs a scan and returns the PDF. Optional `nmap=<job id>` attaches an authorized port-scan section only when that completed job is for the same host and the same tenant. The PDF includes the executive summary, a remediation list ordered by severity weight, and the risk-score trend for that tenant.
 
-Results include `risk` (`score`, `letter`, `factors`), `history.changes`, and `assets`. If no module returned data, `risk.score` is null and `risk.letter` is `n/a`.
+Results include `risk` (`score`, `letter`, `factors`), `history.changes`, `assets`, and `dossier`. If no module returned data, `risk.score` is null and `risk.letter` is `n/a`.
+
+`dossier` is the owner pivot. `progression` is the order of public discoveries. `contacts`, `people`, `organization`, `mailProvider`, `publicKeys`, and `news` are only values a source actually returned. `emailsDiscovered` lists addresses that were not on the first page pass and were then breach-checked. `stopped` is `no-new-identifiers`, `round-cap`, or `lookup-cap`. The loop does not scan a newly seen domain and does not query a people-search site with a person name.
 
 Bulk, up to 20 hosts:
 

@@ -139,6 +139,7 @@ const observeTls = (host) =>
           protocol: socket.getProtocol?.() || null,
           authorized: socket.authorized,
           subject: cert?.subject?.CN || null,
+          organization: cert?.subject?.O || null,
           issuer: cert?.issuer?.O || cert?.issuer?.CN || null,
           validTo: cert?.valid_to || null,
           expired: Number.isFinite(validTo) ? validTo < Date.now() : false,
