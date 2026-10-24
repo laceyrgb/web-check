@@ -176,6 +176,7 @@ const Desk = (): JSX.Element => {
         <Monitor onRun={run} call={call} target={target} />
       </section>
       <History target={target} onRun={run} call={call} />
+      <Offline apiKey={apiKey} onRun={run} call={call} />
       <Nmap onRun={run} call={call} target={target} />
       <Engagement onRun={run} call={call} />
       <Audit onRun={run} call={call} />
@@ -244,6 +245,81 @@ const Monitor = ({
         List monitors
       </button>
     </label>
+  );
+};
+
+const Offline = ({
+  apiKey,
+  onRun,
+  call,
+}: {
+  apiKey: string;
+  onRun: (work: () => Promise<unknown>) => void;
+  call: (path: string, init?: RequestInit) => Promise<any>;
+}) => {
+  const [removeLocal, setRemoveLocal] = useState(true);
+  const download = () =>
+    onRun(async () => {
+      const headers = new Headers();
+      if (apiKey) headers.set('x-api-key', apiKey);
+      const response = await fetch(`${deskApi()}/export.zip`, { headers });
+      if (!response.ok) {
+        const text = await response.text();
+        let message = text;
+        try {
+          message = JSON.parse(text).error || message;
+        } catch {
+          message = text;
+        }
+        throw new Error(message || `HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'cormorant-offline.zip';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      return {
+        downloaded: anchor.download,
+        note: 'Save the zip onto the USB or external drive. This server still has the copy until a drive export with removal finishes.',
+      };
+    });
+  return (
+    <section>
+      <h2>Offline copy</h2>
+      <p>
+        Write this tenant&apos;s scans, dossiers, and PDFs to a USB stick or external drive. Open
+        index.html from the drive. The folder does not contact the server, and passwords are not
+        copied.
+      </p>
+      <label>
+        <input
+          type="checkbox"
+          checked={removeLocal}
+          onChange={(event) => setRemoveLocal(event.target.checked)}
+        />
+        Remove the server copy after the drive write succeeds
+      </label>
+      <button
+        type="button"
+        onClick={() =>
+          onRun(() =>
+            call('/export', {
+              method: 'POST',
+              body: JSON.stringify({ removeLocal }),
+            }),
+          )
+        }
+      >
+        Save to external drive
+      </button>
+      <button type="button" onClick={download}>
+        Download zip
+      </button>
+    </section>
   );
 };
 

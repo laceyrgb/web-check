@@ -279,5 +279,38 @@ export const createFileStore = (
       const shot = load().screenshots[shotId] || null;
       return owned(shot, tenant) ? shot : null;
     },
+    listNmap: (tenant) => Object.values(load().nmapJobs).filter((row) => owned(row, tenant)),
+    listAuthorizations: (tenant) =>
+      Object.values(load().authorizations).filter((row) => owned(row, tenant)),
+    // Drops exported records for one tenant. Other tenants stay. Engagement secrets stay.
+    removeExported(tenant, spec = {}) {
+      const state = load();
+      const drop = (collection, ids) => {
+        let count = 0;
+        for (const id of ids || []) {
+          const row = state[collection]?.[id];
+          if (!owned(row, tenant)) continue;
+          delete state[collection][id];
+          count += 1;
+        }
+        return count;
+      };
+      const counts = {
+        scans: drop('scans', spec.scanIds),
+        bulks: drop('bulks', spec.bulkIds),
+        monitors: drop('monitors', spec.monitorIds),
+        nmapJobs: drop('nmapJobs', spec.nmapIds),
+        screenshots: drop('screenshots', spec.screenshotIds),
+        authorizations: drop('authorizations', spec.authorizationIds),
+      };
+      const assets = state.assets?.[tenant];
+      const timeline = state.timeline?.[tenant];
+      for (const host of spec.hosts || []) {
+        if (assets) delete assets[host];
+        if (timeline) delete timeline[host];
+      }
+      save();
+      return counts;
+    },
   };
 };

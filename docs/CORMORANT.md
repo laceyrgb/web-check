@@ -16,6 +16,16 @@ Desk page: `/desk`. Result pages show a risk rollup and a PDF button. The PDF is
 
 State is a JSON file under `WEBCHECK_DATA_DIR` (default `.data`). Engagement secrets live in a separate file with mode `0600` and are never returned by GET.
 
+## Offline copy
+
+Scan results are not uploaded anywhere. To keep them off the web server, mount a USB stick or external drive and set `WEBCHECK_EXPORT_DIR` to that mount path. `POST /api/v1/export` writes a folder there: `index.html`, `manifest.json`, one JSON file per scan, and a PDF for each completed scan. Open `index.html` from the drive. It does not contact the server.
+
+The write is synced, then a `COMPLETE` file is added. With `{ "removeLocal": true }` the server deletes that tenant's scans, monitors, timelines, assets, and screenshot files only after `COMPLETE` is present. A failed write leaves the server copy in place. Engagement passwords are not copied and are not deleted.
+
+`GET /api/v1/export.zip` downloads the same folder as a zip for a drive plugged into the workstation. That download does not remove the server copy. Set the export directory and use `removeLocal` when the drive is mounted on the server itself.
+
+`WEBCHECK_EXPORT_DIR` must be a real directory outside `WEBCHECK_DATA_DIR`, and it cannot be the filesystem root. The request body cannot choose a different path.
+
 ## Tenants
 
 Each API key belongs to one tenant. `WEBCHECK_API_KEY` is the `default` tenant. `WEBCHECK_TENANT_KEYS` is a comma-separated `tenant:key` list for additional clients. Scans, monitors, assets, timelines, authorizations, engagements, and screenshots are stored under that tenant and are not returned to another key. A store written before tenants existed is loaded under `default`.

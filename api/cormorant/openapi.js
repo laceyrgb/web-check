@@ -20,6 +20,12 @@ export const openapi = {
     '/api/v1/history': {
       get: { summary: 'Read-only per-target scan history, risk trend, and latest findings' },
     },
+    '/api/v1/export': {
+      post: { summary: 'Write this tenant offline bundle onto WEBCHECK_EXPORT_DIR' },
+    },
+    '/api/v1/export.zip': {
+      get: { summary: 'Download the offline bundle. Does not remove the server copy.' },
+    },
     '/api/v1/assets': { get: { summary: 'Deduped asset inventory' } },
     '/api/v1/authorizations': { post: { summary: 'Record an authorized-target acknowledgement' } },
     '/api/v1/nmap': {

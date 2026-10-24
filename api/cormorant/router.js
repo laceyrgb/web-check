@@ -25,6 +25,8 @@ import {
 import { inspectApkBuffer, inspectStoreUrl } from './apk.js';
 import { buildSbom, parseManifest, publicGithubLockfile, queryOsv } from './sbom.js';
 import { fetchPeople } from './content.js';
+import { exportToDrive, exportZip } from './export.js';
+import { renderReport as defaultRenderReport } from './pdf.js';
 import { httpGet } from '../_common/http.js';
 import { openapi } from './openapi.js';
 
@@ -70,6 +72,7 @@ export const createRouter = ({
   nmapRunner = exec,
   nucleiRunner = exec,
   deliverAlerts = defaultDeliverAlerts,
+  renderReport = defaultRenderReport,
 } = {}) => {
   const tenantOf = (req) => req.tenant || 'default';
   const router = express.Router();
@@ -231,6 +234,7 @@ export const createRouter = ({
       openapi: '/api/v1/openapi.json',
       nmapEnabled: flagOn('WEBCHECK_NMAP_ENABLED'),
       pentestEnabled: flagOn('WEBCHECK_PENTEST_ENABLED'),
+      exportConfigured: Boolean(process.env.WEBCHECK_EXPORT_DIR),
     });
   });
   router.get('/openapi.json', (req, res) => res.json(openapi));
@@ -426,6 +430,43 @@ export const createRouter = ({
         .slice(1)
         .map((row, index) => ({ at: row.scannedAt, changes: diffScans(rows[index], row) }));
       return res.json({ target: hostname, snapshots: rows, changes });
+    }),
+  );
+  router.post(
+    '/export',
+    wrap(async (req, res) => {
+      try {
+        const target = req.body?.target ? hostFrom(req.body.target) : null;
+        const result = await exportToDrive({
+          store,
+          tenant: tenantOf(req),
+          target,
+          removeLocal: req.body?.removeLocal === true,
+          renderReport,
+        });
+        return res.json(result);
+      } catch (error) {
+        return res
+          .status(error.status || 500)
+          .json({ error: error.message, code: error.code || 'export-failed' });
+      }
+    }),
+  );
+  router.get(
+    '/export.zip',
+    wrap(async (req, res) => {
+      try {
+        const target = req.query.target ? hostFrom(req.query.target) : null;
+        const result = await exportZip({ store, tenant: tenantOf(req), target, renderReport });
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+        res.setHeader('Cache-Control', 'no-store');
+        return res.send(result.zip);
+      } catch (error) {
+        return res
+          .status(error.status || 500)
+          .json({ error: error.message, code: error.code || 'export-failed' });
+      }
     }),
   );
   router.get(

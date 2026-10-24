@@ -17,6 +17,7 @@ When neither `WEBCHECK_API_KEY` nor `WEBCHECK_TENANT_KEYS` is set, routes are op
 | `WEBCHECK_API_KEY` | API is open unless `WEBCHECK_TENANT_KEYS` is set. This key is tenant `default` |
 | `WEBCHECK_TENANT_KEYS` | No extra tenants. Format `acme:secret,other:secret` |
 | `WEBCHECK_DATA_DIR` | Store files in `./.data` |
+| `WEBCHECK_EXPORT_DIR` | Drive export is refused. Download `/api/v1/export.zip` instead |
 | `WEBCHECK_SCAN_CONCURRENCY` | One scan at a time |
 | `WEBCHECK_DISABLE_SCHEDULER` | Monitor timer runs |
 | `HIBP_API_KEY` | Email checks use the public XposedOrNot index |
@@ -80,6 +81,19 @@ Slack and email are sent only for `risk-worse`, `new-subdomain`, `new-cert-name`
 `GET /api/v1/timeline?target=example.com` returns snapshots and those diffs.
 
 `GET /api/v1/history?target=example.com` is read-only. It returns `{ target, tenant, scans, trend, latestFindings }` for the caller's tenant. `scans` is the latest 30 jobs with status and risk. `trend` is `{ scannedAt, riskScore }`. `latestFindings` is the newest completed scan's risk, executive summary, and changes, or null.
+
+## Offline export
+
+```bash
+curl -s -X POST localhost:3000/api/v1/export \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: ...' \
+  -d '{"removeLocal":true}'
+```
+
+Requires `WEBCHECK_EXPORT_DIR` to be the mount path of a USB stick or external drive. The response `directory` is the folder written on that drive. `removeLocal: true` deletes the exported scans and related records from the server only after `COMPLETE` is on the drive. Omit it to keep the server copy.
+
+`GET /api/v1/export.zip` returns the same files as a zip and does not delete anything. Optional `?target=example.com` limits either call to one host. Passwords, API keys, and session cookies are omitted.
 
 `GET /api/v1/assets?target=example.com` returns deduped hosts, IPs, services, technologies, and published emails with `firstSeen` and `lastSeen`.
 
