@@ -1,0 +1,41 @@
+{
+  "dns": {
+    "txt": {
+      "scan.example": ["v=spf1 include:mail.scan.example -all"],
+      "_dmarc.scan.example": ["v=DMARC1; p=none; rua=mailto:dmarc@scan.example"]
+    },
+    "mx": [{ "exchange": "mail.scan.example", "priority": 10 }],
+    "mxResolves": { "mail.scan.example": true },
+    "ns": ["ns1.scan.example"],
+    "nsResolves": { "ns1.scan.example": true },
+    "caa": [],
+    "dnssec": { "ds": false, "dnskey": false },
+    "cnames": [
+      {
+        "host": "old.scan.example",
+        "target": "old.scan.example.github.io",
+        "targetResolves": false
+      }
+    ],
+    "dkim": []
+  },
+  "http": {
+    "status": 200,
+    "scheme": "https",
+    "headers": {
+      "server": "Apache/2.4.49 (Unix)",
+      "access-control-allow-origin": "*",
+      "set-cookie": ["sid=secretvalue; Path=/"]
+    },
+    "bodySnippet": "<html><script src=\"/jquery-3.4.1.min.js\"></script></html>"
+  },
+  "tls": {
+    "protocol": "TLSv1.0",
+    "cipher": "AES128-SHA",
+    "authorized": true,
+    "bits": 2048,
+    "validTo": "2030-01-01T00:00:00.000Z"
+  },
+  "ctNames": ["www.scan.example", "admin.scan.example", "*.scan.example", "other.example"],
+  "passivePorts": [{ "port": 3306, "product": "MySQL", "source": "fixture" }]
+}
