@@ -1,8 +1,7 @@
-import * as cheerio from 'cheerio';
-import urlLib from 'url';
 import middleware from './_common/middleware.js';
 import { httpGet, isBotCheck, BOT_CHECK_ERROR } from './_common/http.js';
 import { upstreamError } from './_common/upstream.js';
+import { extractAnchors, hostOf } from './_common/page-links.js';
 
 const linkedPagesHandler = async (url) => {
   let response;
@@ -12,25 +11,17 @@ const linkedPagesHandler = async (url) => {
     return upstreamError(error, 'Linked pages fetch');
   }
   if (isBotCheck(response)) return BOT_CHECK_ERROR;
-  const html = response.data;
-  const $ = cheerio.load(html);
+  const pageUrl = response.url || url;
+  const originHost = hostOf(pageUrl);
   const internalLinksMap = new Map();
   const externalLinksMap = new Map();
 
-  // Get all links on the page
-  $('a[href]').each((i, link) => {
-    const href = $(link).attr('href');
-    const absoluteUrl = urlLib.resolve(url, href);
-
-    // Check if absolute / relative, append to appropriate map or increment occurrence count
-    if (absoluteUrl.startsWith(url)) {
-      const count = internalLinksMap.get(absoluteUrl) || 0;
-      internalLinksMap.set(absoluteUrl, count + 1);
-    } else if (href.startsWith('http://') || href.startsWith('https://')) {
-      const count = externalLinksMap.get(absoluteUrl) || 0;
-      externalLinksMap.set(absoluteUrl, count + 1);
-    }
-  });
+  // Count each resolved page link, keeping same-site ones apart from the rest
+  for (const href of extractAnchors(response.data, pageUrl)) {
+    const bucket = hostOf(href) === originHost ? internalLinksMap : externalLinksMap;
+    const count = bucket.get(href) || 0;
+    bucket.set(href, count + 1);
+  }
 
   // Sort by most occurrences, remove supplicates, and convert to array
   const internalLinks = [...internalLinksMap.entries()]

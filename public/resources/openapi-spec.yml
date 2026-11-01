@@ -1890,6 +1890,21 @@ paths:
               schema:
                 type: object
                 properties:
+                  source:
+                    type: string
+                    description: sitemap when a sitemap file was published, crawl when links were collected from the page
+                    enum:
+                      - sitemap
+                      - crawl
+                  pagesCrawled:
+                    type: integer
+                    description: How many pages the crawl fetched, when no sitemap file was published
+                  valid:
+                    type: integer
+                    description: How many crawled links responded with a working status
+                  truncated:
+                    type: boolean
+                    description: True when the crawl stopped before following every same-site link
                   urlset:
                     type: object
                     properties:
@@ -1939,6 +1954,12 @@ paths:
                                 format: float
                               description: The priority of the page
                               example: 1.00
+                            status:
+                              type: array
+                              items:
+                                type: string
+                              description: HTTP status from the crawl, when the list was built by following links
+                              example: '200'
     description: |
       Note: The structure might need changing to show pages below each user-agent.
         '204':
