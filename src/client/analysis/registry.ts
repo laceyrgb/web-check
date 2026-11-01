@@ -30,6 +30,7 @@ import redirects from './rules/redirects';
 import vulnerabilities from './rules/vulnerabilities';
 import robotsTxt from './rules/robots-txt';
 import tlsClientCompat from './rules/tls-client-compat';
+import sitemap from './rules/sitemap';
 
 /* Map of card id to its pure analyzer */
 export const analyzers: Partial<Record<CheckId, Analyzer>> = {
@@ -60,6 +61,7 @@ export const analyzers: Partial<Record<CheckId, Analyzer>> = {
   vulnerabilities,
   'robots-txt': robotsTxt,
   'tls-client-compat': tlsClientCompat,
+  sitemap,
 };
 
 /* Run each analyzer against successful job state with valid object payload */
