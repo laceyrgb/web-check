@@ -18,7 +18,8 @@
     "lint": "eslint --config .config/eslint.config.js .",
     "format:check": "prettier --check --ignore-unknown '!yarn.lock' '!**/*.md' .",
     "format:fix": "prettier --write --ignore-unknown '!yarn.lock' '!**/*.md' .",
-    "hold-my-beer": "yarn format:fix && yarn lint && yarn typecheck"
+    "hold-my-beer": "yarn format:fix && yarn lint && yarn typecheck",
+    "test": "node --test suite/test/*.test.js api/_common/page-links.test.js"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",
