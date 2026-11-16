@@ -1,0 +1,54 @@
+{
+  "label": "reference-only",
+  "needsHumanReview": true,
+  "status": "template",
+  "note": "v2.1 ids are blank until a human verifies them against the official UAE IA text. A blank is not a mapping and must not be filled by guesswork.",
+  "sourceV11": "UAE Information Assurance Regulation v1.1, TDRA",
+  "sourceV11Url": "https://tdra.gov.ae/-/media/About/regulations-and-ruling/EN/UAE-Information-Assurance-Regulation-v1-1-pdf.ashx",
+  "sourceV21": "",
+  "sourceV21Url": "",
+  "rows": [
+    {
+      "v11": "T1.2.1",
+      "v11Name": "Inventory of Assets",
+      "v21": "",
+      "v21Name": "",
+      "verified": false
+    },
+    {
+      "v11": "T4.2.4",
+      "v11Name": "Electronic Messaging",
+      "v21": "",
+      "v21Name": "",
+      "verified": false
+    },
+    {
+      "v11": "T4.5.2",
+      "v11Name": "Security of Network Services",
+      "v21": "",
+      "v21Name": "",
+      "verified": false
+    },
+    {
+      "v11": "T7.4.1",
+      "v11Name": "Policy on the Use of Cryptographic Controls",
+      "v21": "",
+      "v21Name": "",
+      "verified": false
+    },
+    {
+      "v11": "T7.7.1",
+      "v11Name": "Control of Technical Vulnerabilities",
+      "v21": "",
+      "v21Name": "",
+      "verified": false
+    },
+    {
+      "v11": "M5.2.1",
+      "v11Name": "Identification of Applicable Legislation",
+      "v21": "",
+      "v21Name": "",
+      "verified": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+id: cormorant-security-txt
+info:
+  name: security.txt publishes a contact
+  author: cormorant
+  severity: info
+  description: A published security.txt with a Contact field. GET only.
+  tags: exposure
+  reference:
+    - https://www.rfc-editor.org/rfc/rfc9116
+http:
+  - method: GET
+    path:
+      - '{{BaseURL}}/.well-known/security.txt'
+    matchers:
+      - type: word
+        part: body
+        words:
+          - 'Contact:'

@@ -1,0 +1,18 @@
+id: cormorant-robots-txt
+info:
+  name: robots.txt is published
+  author: cormorant
+  severity: info
+  description: Looks for a robots.txt file. GET only. Does not treat Disallow as a vulnerability.
+  tags: misconfig
+  reference:
+    - https://www.rfc-editor.org/rfc/rfc9309
+http:
+  - method: GET
+    path:
+      - '{{BaseURL}}/robots.txt'
+    matchers:
+      - type: word
+        part: body
+        words:
+          - 'User-agent:'

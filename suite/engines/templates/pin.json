@@ -1,0 +1,8 @@
+{
+  "id": "cormorant-safe-2026-11",
+  "files": {
+    "missing-hsts.yaml": "8d68c08921db2818ec6a907fa41095abba7c31e117b8376283ab3da6a7e14c83",
+    "robots-txt.yaml": "ee1b61882573e02cd3dbd403fe42b9f683e282409b5ebb45d36f26a4823c6b36",
+    "security-txt.yaml": "0b520e96ec94cdb2a819da499375e8f30d1513b97e33a3bc4ef292ac75430f52"
+  }
+}
