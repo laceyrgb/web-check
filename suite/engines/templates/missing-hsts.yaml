@@ -1,0 +1,17 @@
+id: cormorant-missing-hsts
+info:
+  name: Homepage has no Strict-Transport-Security
+  author: cormorant
+  severity: low
+  description: One GET of the base URL. Matches when the HSTS header is absent.
+  tags: ssl
+  reference:
+    - https://www.rfc-editor.org/rfc/rfc6797
+http:
+  - method: GET
+    path:
+      - '{{BaseURL}}'
+    matchers:
+      - type: dsl
+        dsl:
+          - '!contains(tolower(all_headers), "strict-transport-security")'

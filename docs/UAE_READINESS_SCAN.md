@@ -25,7 +25,7 @@ Canonical source: `node suite/cli.js inventory`, which prints `suite/inventory.j
 | `ssl` | TLS and security headers | Existing: direct TLS handshake and certificate chain | Re-implemented from a TLS snapshot |
 | `tls-connection` | TLS and security headers | Existing: negotiated protocol and cipher | Re-implemented from a TLS snapshot |
 | `tls-labs` | TLS and security headers | Partial: SSL Labs cache only, no new assessment | Not called |
-| `mixed-content` | TLS and security headers | Partial: finds http resources in the page | Still missing from the runner |
+| `mixed-content` | TLS and security headers | Partial: finds http resources in the page | Reported for HTTPS pages in the active same-site crawl |
 | `redirects` | TLS and security headers | Partial: redirect chain | Partial: cleartext scheme is flagged when the snapshot says so |
 | `cookies` | TLS and security headers | Existing: Secure, HttpOnly, SameSite on Set-Cookie | Re-implemented, plus SameSite=None and __Host-/__Secure- rules |
 | `dns` | DNS hygiene | Partial: A, AAAA, MX, TXT, NS, CNAME, SOA, SRV, PTR | Used as input ideas; the suite judges NS count, CAA, DNSSEC, and dangling names |
@@ -37,13 +37,13 @@ Canonical source: `node suite/cli.js inventory`, which prints `suite/inventory.j
 | `ports` | Attack-surface discovery | Existing but active: TCP connect to a wide common-port list. Not nmap. | Not called. Passive records are judged. A gated connect uses a short risky-port list and node:net |
 | `shodan` | Attack-surface discovery | Partial: passive host data, needs an API key | Not called |
 | `get-ip` | Attack-surface discovery | Partial: resolves the address | Not called. Live mode refuses non-public addresses |
-| `firewall` | Attack-surface discovery | Partial: passive WAF header fingerprints | Still missing from the runner |
-| `robots-txt` | Attack-surface discovery | Partial: fetches robots.txt | Still missing from the runner |
-| `security-txt` | Attack-surface discovery | Existing: security.txt | Not called. Exposed-file checks are a separate gated list |
-| `sitemap` | Attack-surface discovery | Partial: sitemap, or a same-site link crawl when there is none | Not called. The crawl stays in the legacy API |
+| `firewall` | Attack-surface discovery | Partial: passive WAF header fingerprints | Passive fingerprints in the runner (Cloudflare, Sucuri, Akamai, Imperva, F5, ModSecurity) |
+| `robots-txt` | Attack-surface discovery | Partial: fetches robots.txt | Fetched with the homepage. Sensitive Disallow paths are flagged |
+| `security-txt` | Attack-surface discovery | Existing: security.txt | Fetched with the homepage. A Contact field is a pass |
+| `sitemap` | Attack-surface discovery | Partial: sitemap, or a same-site link crawl when there is none | Active gate crawls same-site links (the same link rules as that crawl) and checks cookies and mixed content. Capped at 5 pages |
 | `linked-pages` | Attack-surface discovery | Partial: links on the crawled pages | Not called |
 | `archives` | Attack-surface discovery | Partial: historical URLs | Still missing from the runner |
-| `tech-stack` | Vulnerability scan | Partial: Wappalyzer fingerprint, no version matching | Not called. A short local version catalog was added instead |
+| `tech-stack` | Vulnerability scan | Partial: Wappalyzer fingerprint, no version matching | Not called. Banner versions are matched to a cached NVD, CISA KEV, and EPSS extract |
 | `threats` | Vulnerability scan | Partial: Safe Browsing and similar, needs an API key | Not called |
 | `block-lists` | Vulnerability scan | Partial: DNS blocklist reputation | Not called |
 | `breaches` | Breach and exposure | Partial: Have I Been Pwned domain list | Still missing from the runner. Personal breach data stays out of this report |
@@ -74,35 +74,38 @@ Canonical source: `node suite/cli.js inventory`, which prints `suite/inventory.j
 | CORS | Wildcard on the homepage, and a gated reflection probe |
 | Exposed files | Fixed signature list, gated, bodies not copied into the report |
 | Cookie depth | SameSite=None without Secure, and __Host- / __Secure- prefix rules |
-| Version catalog | Apache 2.4.49/2.4.50, OpenSSL 1.0.1 Heartbleed range, jQuery before 3.5.0, PHP outside security support |
+| CVE cache | Normalised NVD + CISA KEV + EPSS. KEV and high EPSS raise priority. Banner match only. A small cache ships with the repo; refresh-intel is a separate operator command |
 | Passive ports | Judges supplied port records. Does not call Shodan or nmap |
 | Gated TCP connect | Short risky-port list via node:net, no payload, only after the gates |
 | Email depth | BIMI only counts with enforced DMARC, null MX, weak and revoked DKIM |
 | Certificate-transparency names | Flags administrative labels in a supplied extract; live mode uses crt.sh |
 | Report diff | Added and removed open findings, for a future monitoring subscription |
-| Nuclei adapter | Off by default. Tag allow-list, no interactsh, raw responses omitted. Not an exploit scan |
+| Nuclei adapter | Off by default. Pinned GET-only templates, pin checked before launch, no interactsh, raw responses omitted |
+| Human sign-off | Critical and high findings must be approved, edited, or suppressed with a reason before release. Append-only audit log |
+| Monitoring events | Ownership is re-checked every run. JSON events for new and resolved findings and score changes. No mail sender yet |
+| Same-site crawl in the report | Behind the active gate. Headers on the homepage, cookies and mixed content on crawled pages |
+| robots.txt, security.txt, WAF | Passive checks on the homepage fetch |
+| UAE IA v1.1 control ids | Cited from the TDRA regulation and labelled reference-only. DESC ISR is named without invented clause numbers |
+| AED report metadata and sector packs | Currency AED. Packs for Microsoft 365, Google Workspace, WooCommerce, Shopify, and common UAE shared hosting |
+| Executive brief | One-page HTML (EN/AR, RTL) and a one-page English PDF. Arabic is marked as needing native review. Fixes ranked by impact versus effort |
 
 ### Still missing
 
 | # | Gap | Why it is still open |
 | --- | --- | --- |
 | 1 | Licensed breach data | Domain-level exposure with PDPL minimisation. The legacy HIBP list is not in this report |
-| 2 | Full vulnerability feeds | NVD, CISA KEV, and EPSS. The starter catalog is intentionally small |
-| 3 | Authenticated DAST | OWASP ZAP (Apache-2.0) is the candidate. It is not invoked: an active scan is out of policy for this phase |
-| 4 | Monitoring product | Schedule, re-verify ownership each run, store reports, and alert. Only the diff function exists |
-| 5 | Human sign-off | A queue so critical and high items are confirmed before a customer receives them |
-| 6 | Confirmed takeover | Dangling CNAMEs are leads. The suite does not claim a takeover |
-| 7 | Zone transfer | AXFR is intentionally not implemented |
-| 8 | Cloud bucket names | Guessing storage hostnames is not implemented |
-| 9 | Whole-site header crawl | The legacy sitemap crawler is not fed into this report |
-| 10 | Mixed content | Still only in the legacy UI |
-| 11 | WAF fingerprint and robots.txt | Still only in the legacy UI |
-| 12 | Official control IDs | UAE IA / DESC / PDPL article mapping needs a human against the official text |
-| 13 | Native Arabic edit | The Arabic in this report is a first draft for a reviewer, not a delivered translation |
-| 14 | PDF one-pager | HTML is printable; a designed PDF is not built |
-| 15 | Customer audit log | Who ordered the scan, the proof, the time, and the source address |
-| 16 | Sector packs | Microsoft 365, Google Workspace, WooCommerce, and similar fix text |
-| 17 | nmap | Not used. Its licence is the wrong fit for shipping inside this product |
+| 2 | Full NVD in git | The matcher and the feed normaliser exist. The committed cache is a small extract, not the whole database |
+| 3 | Authenticated DAST | OWASP ZAP (Apache-2.0) is still not invoked. An active scan stays out of policy for this phase |
+| 4 | Alert delivery | Monitoring emits JSON events. Email, SMS, and WhatsApp delivery are not built |
+| 5 | UAE IA v2.1 crosswalk | Ids are from TDRA v1.1. A reviewer must confirm them against v2.1 before they are cited as current |
+| 6 | DESC ISR clause numbers | The report names the regulation and does not invent clause numbers |
+| 7 | Native Arabic edit | Arabic is marked needs-native-review. It is not a delivered translation |
+| 8 | Arabic inside the PDF | The one-page PDF is English because standard PDF fonts have no Arabic glyphs. Arabic is in the HTML brief |
+| 9 | Confirmed takeover | Dangling CNAMEs are leads. The suite does not claim a takeover |
+| 10 | Zone transfer | AXFR is intentionally not implemented |
+| 11 | Cloud bucket names | Guessing storage hostnames is not implemented |
+| 12 | Customer order log | The reviewer audit log exists. Who ordered the scan, payment, and source address are not stored |
+| 13 | nmap | Not used. Its licence is the wrong fit for shipping inside this product |
 <!-- inventory:end -->
 
 ## How to run it
@@ -114,7 +117,7 @@ node suite/cli.js inventory
 node suite/cli.js scan --target scan.example --observations suite/fixtures/example-observations.json --out /tmp/readiness
 ```
 
-That second command does not contact the network. `scan.example` is a reserved example name. It writes `/tmp/readiness/report.json` and `/tmp/readiness/report.html`. The HTML report has an executive summary, a score, prioritised fixes, and the same findings in Arabic. UAE IA and PDPL lines are marked reference-only.
+That second command does not contact the network. `scan.example` is a reserved example name. It writes `report.json`, `report.html`, `executive.html` (one page, English and Arabic, RTL), and `executive.pdf` (one English page). Arabic is marked as needing a native reviewer. Fixes are ranked by impact against effort. The currency metadata is AED. UAE IA control ids are from Regulation v1.1 and are labelled reference-only.
 
 Tests, including the legacy same-site link crawl:
 
@@ -147,29 +150,38 @@ Active checks are the exposed-file signatures, one CORS reflection request, and 
 node suite/cli.js scan --target customer.example --live --mode active --authorized --verify-token '<token>' --out /tmp/readiness
 ```
 
-There is no exploitation, no brute force, no credential testing, and no nmap. Request bodies from exposed files are not copied into the report. Critical and high findings are flagged for a human reviewer.
+There is no exploitation, no brute force, no credential testing, and no nmap. Request bodies from exposed files are not copied into the report. The active crawl stays on the same host, follows the same link rules as the page-link crawl, and stops after 5 pages. It checks cookies and mixed content on those pages. `robots.txt`, `security.txt`, and a passive WAF fingerprint run with the homepage fetch.
 
-Nuclei (MIT, not bundled) can be attached to an already authorised active run. The adapter allow-lists the tags `misconfig,exposure,tech,ssl,dns`, excludes exploit and brute-force tags, disables interactsh, and omits raw responses. OWASP ZAP is not invoked.
+A report is a draft until every open critical and high finding is approved, edited, or suppressed. Suppress and edit require a reason. The audit log is append-only.
+
+```bash
+node suite/cli.js review --report /tmp/readiness/report.json --decisions decisions.json --reviewer "Amina Al" --out /tmp/released
+```
+
+`decisions.json` is `{ "decisions": [{ "id": "tech.apache.path-traversal", "action": "approve", "reason": "Banner matches the host" }] }`. `action` is `approve`, `edit`, or `suppress`.
+
+Nuclei (MIT, not bundled) runs only on an authorised active scan, and only the pinned GET-only templates in `suite/engines/templates`. The pin is checked before launch. Interactsh stays off. OWASP ZAP is not invoked.
 
 ```bash
 node suite/cli.js scan --target customer.example --live --mode active --authorized --verify-token '<token>' --nuclei /usr/bin/nuclei --out /tmp/readiness
 ```
 
-A previous report can be passed with `--previous /tmp/readiness/report.json` on a later run. The new report then includes which open findings appeared or cleared. That is the seed of the monitoring subscription, not the subscription itself.
+Monitoring re-checks ownership every run, then diffs the report. Alerts are JSON events (`finding.opened`, `finding.resolved`, `score.changed`). A government name is refused before that check. Pass `--live` and a subscription file. This does not send email.
 
-Library entry point: `import { runScan, renderHtml } from './suite/index.js'`. Pass `observations` to stay offline. The runner does not mount a route on the public web-check server.
+Version matching uses a cached NVD + CISA KEV + EPSS extract. KEV and high EPSS raise the priority. The match is the banner only. `node suite/cli.js refresh-intel --fetch` is a separate operator command that contacts NVD, CISA, and FIRST. It is not part of a customer scan. The file in git is a small extract, not the whole NVD.
 
-## Top 10 roadmap ideas
+UAE IA control ids on each finding are from the TDRA Regulation v1.1 text (for example T4.2.4 Electronic Messaging, T7.7.1 Control of Technical Vulnerabilities, T7.4.1 cryptographic policy, T1.2.1 Inventory of Assets, T4.5.2 Security of Network Services, M5.2.1 Identification of Applicable Legislation). Source: https://tdra.gov.ae/-/media/About/regulations-and-ruling/EN/UAE-Information-Assurance-Regulation-v1-1-pdf.ashx . v2.1 may renumber families, so a reviewer confirms the current id before it is cited. DESC ISR is named, without invented clause numbers, at https://www.desc.gov.ae/regulations/licenses/ . PDPL notes stay reference-only and point at https://www.uaelegislation.gov.ae/en/legislations/1972 .
 
-The full ranking, including how each idea changes the report a customer actually reads, is in [SUITE_ROADMAP.md](./SUITE_ROADMAP.md). The first ten:
+Sector packs add plain-language fix text when the snapshot looks like Microsoft 365, Google Workspace, WooCommerce, Shopify, or common UAE shared hosting (cPanel, Plesk, LiteSpeed, and a few local host strings).
 
-1. Human sign-off queue so a critical or high finding is confirmed before the report is marked deliverable.
-2. Monitoring subscription: schedule, re-check ownership every run, store reports, alert on the diff this suite already computes.
-3. Ship a curated nuclei template set behind the gates that already exist. Keep exploit tags excluded.
-4. OWASP ZAP baseline (Apache-2.0) only under a signed scope. Leave the active scanner out.
-5. Licensed breach data at domain level, with PDPL minimisation. Keep personal breach rows out of the default report.
-6. Replace the starter version catalog with NVD, CISA KEV, and EPSS, still matching banners only.
-7. Native Arabic edit and a one-page PDF an owner can forward.
-8. A human maps findings to official UAE IA control IDs. Keep the label reference-only.
-9. Sector packs for Microsoft 365, Google Workspace, and WooCommerce, with fix text in both languages.
-10. Feed the existing same-site crawl into header, cookie, and mixed-content checks, behind the active gate.
+Library entry point: `import { runScan, applyReview, runMonitor } from './suite/index.js'`. Pass `observations` to stay offline.
+
+## What shipped, and the next five
+
+The gap table above is the inventory. [SUITE_ROADMAP.md](./SUITE_ROADMAP.md) has the reasoning. Highest-leverage items still open:
+
+1. A native Arabic edit, then Arabic glyphs in the one-page PDF.
+2. A human crosswalk from these v1.1 ids to UAE IA v2.1, still labelled reference-only.
+3. Deliver the monitoring JSON events by email or WhatsApp, and store each run.
+4. Licensed breach data at domain level, with personal rows kept out of the default report.
+5. An AED checkout in front of this scanner, with the order, the proof, and the reviewer stored together.

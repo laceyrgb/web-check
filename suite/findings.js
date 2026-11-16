@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import { REFS } from './refs.js';
+import { DESC_NOTE, DESC_NOTE_AR, UAE_IA_SOURCE, controlFor } from './uae-map.js';
 
-export const SUITE_VERSION = '0.1.0';
+export const SUITE_VERSION = '0.2.0';
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -107,8 +108,29 @@ export const finding = (input) => {
   }
   const status = input.status === 'pass' ? 'pass' : 'open';
   const theme = themeFor(input.service);
+  const control = controlFor(input.service);
   const openAndSerious =
     status === 'open' && (input.severity === 'critical' || input.severity === 'high');
+  const impactDefault = {
+    critical: 'high',
+    high: 'high',
+    medium: 'medium',
+    low: 'low',
+    info: 'low',
+  };
+  const effortDefault = {
+    critical: 'medium',
+    high: 'medium',
+    medium: 'low',
+    low: 'low',
+    info: 'low',
+  };
+  const impact = ['high', 'medium', 'low'].includes(input.impact)
+    ? input.impact
+    : impactDefault[input.severity];
+  const effort = ['high', 'medium', 'low'].includes(input.effort)
+    ? input.effort
+    : effortDefault[input.severity];
   return {
     id: input.id,
     title: input.title,
@@ -121,9 +143,18 @@ export const finding = (input) => {
     references: input.references.map((item) => ({ title: item.title, url: item.url })),
     service: input.service,
     needsHumanReview: input.needsHumanReview ?? openAndSerious,
+    effort,
+    impact,
+    plainFix: input.plainFix || input.remediation,
+    priority: input.priority || (openAndSerious ? 'soon' : 'later'),
     mapping: {
-      uaeIa: theme.en,
-      uaeIaAr: theme.ar,
+      uaeIa: `${theme.en} UAE IA v1.1 ${control.id} ${control.name}. Reference only: confirm against the current standard before citing it to a customer. Source: ${UAE_IA_SOURCE}`,
+      uaeIaAr: `${theme.ar} الضابط ${control.id} (${control.name}) من الإصدار 1.1. للاسترشاد فقط، ويحتاج تأكيدًا على النص الحالي قبل ذكره للعميل.`,
+      uaeIaControl: control.id,
+      uaeIaControlName: control.name,
+      uaeIaSource: UAE_IA_SOURCE,
+      descIsr: DESC_NOTE,
+      descIsrAr: DESC_NOTE_AR,
       pdpl: theme.pdplEn,
       pdplAr: theme.pdplAr,
     },

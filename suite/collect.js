@@ -1,3 +1,4 @@
+import { crawlSameSite } from './crawl.js';
 import { registrableDomain } from './domain.js';
 import { CORS_PROBE_ORIGIN } from './checks/cors.js';
 import { EXPOSED_PATHS, classifyExposure } from './checks/exposed-files.js';
@@ -213,7 +214,27 @@ export const collectActive = async ({ origin, hostname, transports }) => {
       }
     }
   }
-  return { exposed, corsProbe, openPorts };
+  let pages = [];
+  if (typeof transports.httpGet === 'function') {
+    try {
+      pages = await crawlSameSite({ origin, httpGet: transports.httpGet, limit: 5 });
+    } catch {
+      pages = [];
+    }
+  }
+  return { exposed, corsProbe, openPorts, pages };
+};
+
+const publishedFile = async (transports, url) => {
+  try {
+    const response = await transports.httpGet(url);
+    if (response?.status !== 200) return null;
+    const body = String(response.body || '');
+    if (/<html|<!doctype/i.test(body.slice(0, 400))) return null;
+    return body.slice(0, 20000);
+  } catch {
+    return null;
+  }
 };
 
 export const collectPassive = async ({ hostname, origin, transports }) => {
@@ -228,6 +249,11 @@ export const collectPassive = async ({ hostname, origin, transports }) => {
   if (typeof transports.httpGet === 'function') {
     try {
       observations.http = await collectHttp(origin, transports);
+      observations.robotsTxt = await publishedFile(transports, `${origin}/robots.txt`);
+      observations.securityTxt = await publishedFile(
+        transports,
+        `${origin}/.well-known/security.txt`,
+      );
     } catch (error) {
       observations.httpError = error.message || 'HTTP fetch failed';
     }

@@ -56,7 +56,7 @@ export const legacyChecks = [
     'mixed-content',
     'TLS and security headers',
     'Partial: finds http resources in the page',
-    'Still missing from the runner',
+    'Reported for HTTPS pages in the active same-site crawl',
   ),
   row(
     'redirects',
@@ -113,25 +113,25 @@ export const legacyChecks = [
     'firewall',
     'Attack-surface discovery',
     'Partial: passive WAF header fingerprints',
-    'Still missing from the runner',
+    'Passive fingerprints in the runner (Cloudflare, Sucuri, Akamai, Imperva, F5, ModSecurity)',
   ),
   row(
     'robots-txt',
     'Attack-surface discovery',
     'Partial: fetches robots.txt',
-    'Still missing from the runner',
+    'Fetched with the homepage. Sensitive Disallow paths are flagged',
   ),
   row(
     'security-txt',
     'Attack-surface discovery',
     'Existing: security.txt',
-    'Not called. Exposed-file checks are a separate gated list',
+    'Fetched with the homepage. A Contact field is a pass',
   ),
   row(
     'sitemap',
     'Attack-surface discovery',
     'Partial: sitemap, or a same-site link crawl when there is none',
-    'Not called. The crawl stays in the legacy API',
+    'Active gate crawls same-site links (the same link rules as that crawl) and checks cookies and mixed content. Capped at 5 pages',
   ),
   row(
     'linked-pages',
@@ -149,7 +149,7 @@ export const legacyChecks = [
     'tech-stack',
     'Vulnerability scan',
     'Partial: Wappalyzer fingerprint, no version matching',
-    'Not called. A short local version catalog was added instead',
+    'Not called. Banner versions are matched to a cached NVD, CISA KEV, and EPSS extract',
   ),
   row(
     'threats',
@@ -207,8 +207,8 @@ export const addedChecks = [
   ['Exposed files', 'Fixed signature list, gated, bodies not copied into the report'],
   ['Cookie depth', 'SameSite=None without Secure, and __Host- / __Secure- prefix rules'],
   [
-    'Version catalog',
-    'Apache 2.4.49/2.4.50, OpenSSL 1.0.1 Heartbleed range, jQuery before 3.5.0, PHP outside security support',
+    'CVE cache',
+    'Normalised NVD + CISA KEV + EPSS. KEV and high EPSS raise priority. Banner match only. A small cache ships with the repo; refresh-intel is a separate operator command',
   ],
   ['Passive ports', 'Judges supplied port records. Does not call Shodan or nmap'],
   ['Gated TCP connect', 'Short risky-port list via node:net, no payload, only after the gates'],
@@ -220,7 +220,32 @@ export const addedChecks = [
   ['Report diff', 'Added and removed open findings, for a future monitoring subscription'],
   [
     'Nuclei adapter',
-    'Off by default. Tag allow-list, no interactsh, raw responses omitted. Not an exploit scan',
+    'Off by default. Pinned GET-only templates, pin checked before launch, no interactsh, raw responses omitted',
+  ],
+  [
+    'Human sign-off',
+    'Critical and high findings must be approved, edited, or suppressed with a reason before release. Append-only audit log',
+  ],
+  [
+    'Monitoring events',
+    'Ownership is re-checked every run. JSON events for new and resolved findings and score changes. No mail sender yet',
+  ],
+  [
+    'Same-site crawl in the report',
+    'Behind the active gate. Headers on the homepage, cookies and mixed content on crawled pages',
+  ],
+  ['robots.txt, security.txt, WAF', 'Passive checks on the homepage fetch'],
+  [
+    'UAE IA v1.1 control ids',
+    'Cited from the TDRA regulation and labelled reference-only. DESC ISR is named without invented clause numbers',
+  ],
+  [
+    'AED report metadata and sector packs',
+    'Currency AED. Packs for Microsoft 365, Google Workspace, WooCommerce, Shopify, and common UAE shared hosting',
+  ],
+  [
+    'Executive brief',
+    'One-page HTML (EN/AR, RTL) and a one-page English PDF. Arabic is marked as needing native review. Fixes ranked by impact versus effort',
   ],
 ];
 
@@ -230,38 +255,34 @@ export const missingChecks = [
     'Domain-level exposure with PDPL minimisation. The legacy HIBP list is not in this report',
   ],
   [
-    'Full vulnerability feeds',
-    'NVD, CISA KEV, and EPSS. The starter catalog is intentionally small',
+    'Full NVD in git',
+    'The matcher and the feed normaliser exist. The committed cache is a small extract, not the whole database',
   ],
   [
     'Authenticated DAST',
-    'OWASP ZAP (Apache-2.0) is the candidate. It is not invoked: an active scan is out of policy for this phase',
+    'OWASP ZAP (Apache-2.0) is still not invoked. An active scan stays out of policy for this phase',
   ],
   [
-    'Monitoring product',
-    'Schedule, re-verify ownership each run, store reports, and alert. Only the diff function exists',
+    'Alert delivery',
+    'Monitoring emits JSON events. Email, SMS, and WhatsApp delivery are not built',
   ],
   [
-    'Human sign-off',
-    'A queue so critical and high items are confirmed before a customer receives them',
+    'UAE IA v2.1 crosswalk',
+    'Ids are from TDRA v1.1. A reviewer must confirm them against v2.1 before they are cited as current',
+  ],
+  ['DESC ISR clause numbers', 'The report names the regulation and does not invent clause numbers'],
+  ['Native Arabic edit', 'Arabic is marked needs-native-review. It is not a delivered translation'],
+  [
+    'Arabic inside the PDF',
+    'The one-page PDF is English because standard PDF fonts have no Arabic glyphs. Arabic is in the HTML brief',
   ],
   ['Confirmed takeover', 'Dangling CNAMEs are leads. The suite does not claim a takeover'],
   ['Zone transfer', 'AXFR is intentionally not implemented'],
   ['Cloud bucket names', 'Guessing storage hostnames is not implemented'],
-  ['Whole-site header crawl', 'The legacy sitemap crawler is not fed into this report'],
-  ['Mixed content', 'Still only in the legacy UI'],
-  ['WAF fingerprint and robots.txt', 'Still only in the legacy UI'],
   [
-    'Official control IDs',
-    'UAE IA / DESC / PDPL article mapping needs a human against the official text',
+    'Customer order log',
+    'The reviewer audit log exists. Who ordered the scan, payment, and source address are not stored',
   ],
-  [
-    'Native Arabic edit',
-    'The Arabic in this report is a first draft for a reviewer, not a delivered translation',
-  ],
-  ['PDF one-pager', 'HTML is printable; a designed PDF is not built'],
-  ['Customer audit log', 'Who ordered the scan, the proof, the time, and the source address'],
-  ['Sector packs', 'Microsoft 365, Google Workspace, WooCommerce, and similar fix text'],
   ['nmap', 'Not used. Its licence is the wrong fit for shipping inside this product'],
 ];
 

@@ -1,5 +1,6 @@
 import { finding } from '../findings.js';
 import { REFS } from '../refs.js';
+import { verifyTemplatePin } from './templates.js';
 
 // Allow-list of template tags. CVE and exploit tags are excluded on purpose:
 // many of those templates send attack payloads, and this product does not.
@@ -28,27 +29,32 @@ const SEVERITY = {
   info: 'info',
 };
 
-export const buildNucleiArgs = (targetUrl) => [
-  '-u',
-  targetUrl,
-  '-silent',
-  '-jsonl',
-  '-omit-raw',
-  '-no-interactsh',
-  '-disable-update-check',
-  '-rate-limit',
-  '5',
-  '-timeout',
-  '8',
-  '-retries',
-  '0',
-  '-severity',
-  'info,low,medium,high,critical',
-  '-tags',
-  NUCLEI_TAGS.join(','),
-  '-exclude-tags',
-  NUCLEI_EXCLUDE_TAGS.join(','),
-];
+export const buildNucleiArgs = (targetUrl) => {
+  const pin = verifyTemplatePin();
+  return [
+    '-u',
+    targetUrl,
+    '-t',
+    pin.dir,
+    '-silent',
+    '-jsonl',
+    '-omit-raw',
+    '-no-interactsh',
+    '-disable-update-check',
+    '-rate-limit',
+    '5',
+    '-timeout',
+    '8',
+    '-retries',
+    '0',
+    '-severity',
+    'info,low,medium,high,critical',
+    '-tags',
+    NUCLEI_TAGS.join(','),
+    '-exclude-tags',
+    NUCLEI_EXCLUDE_TAGS.join(','),
+  ];
+};
 
 const tagList = (info) => {
   const tags = info?.tags;
@@ -113,7 +119,12 @@ export const runNuclei = async ({ binary, targetUrl, spawn, activeAllowed }) => 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     return { events: [], skipped: 'Nuclei only runs against http or https.' };
   }
-  const args = buildNucleiArgs(parsed.origin);
+  let args;
+  try {
+    args = buildNucleiArgs(parsed.origin);
+  } catch (error) {
+    return { events: [], skipped: error.message };
+  }
   const result = await spawn(binary, args);
   const events = [];
   for (const line of String(result?.stdout || '').split('\n')) {

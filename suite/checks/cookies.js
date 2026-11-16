@@ -28,14 +28,15 @@ const parseCookie = (line) => {
   return { name, attrs };
 };
 
-const idFor = (kind, name) => {
-  const hash = createHash('sha256').update(name).digest('hex').slice(0, 8);
+const idFor = (kind, name, salt) => {
+  const material = salt ? `${salt}\n${name}` : name;
+  const hash = createHash('sha256').update(material).digest('hex').slice(0, 8);
   return `cookie.${kind}.${hash}`;
 };
 
 const sessionLike = (name) => /session|sid|auth|token|jwt|sess/i.test(name);
 
-export const analyseCookies = (http) => {
+export const analyseCookies = (http, { salt = '' } = {}) => {
   const lines = cookieLines(http?.headers?.['set-cookie'] ?? http?.setCookie);
   if (!lines.length) return [];
   const out = [];
@@ -49,7 +50,7 @@ export const analyseCookies = (http) => {
     if (!secure) {
       out.push(
         finding({
-          id: idFor('secure', name),
+          id: idFor('secure', name, salt),
           title: `Cookie "${name}" is missing Secure`,
           titleAr: `ملف تعريف الارتباط "${name}" بلا سمة Secure`,
           severity: 'medium',
@@ -65,7 +66,7 @@ export const analyseCookies = (http) => {
     if (!httpOnly) {
       out.push(
         finding({
-          id: idFor('httponly', name),
+          id: idFor('httponly', name, salt),
           title: `Cookie "${name}" is missing HttpOnly`,
           titleAr: `ملف تعريف الارتباط "${name}" بلا سمة HttpOnly`,
           severity: sessionLike(name) ? 'medium' : 'low',
@@ -81,7 +82,7 @@ export const analyseCookies = (http) => {
     if (!same) {
       out.push(
         finding({
-          id: idFor('samesite', name),
+          id: idFor('samesite', name, salt),
           title: `Cookie "${name}" has no SameSite attribute`,
           titleAr: `ملف تعريف الارتباط "${name}" بلا سمة SameSite`,
           severity: 'low',
@@ -95,7 +96,7 @@ export const analyseCookies = (http) => {
     } else if (same === 'none' && !secure) {
       out.push(
         finding({
-          id: idFor('samesite-none', name),
+          id: idFor('samesite-none', name, salt),
           title: `Cookie "${name}" uses SameSite=None without Secure`,
           titleAr: `ملف الارتباط "${name}" يستخدم SameSite=None بدون Secure`,
           severity: 'high',
@@ -116,7 +117,7 @@ export const analyseCookies = (http) => {
     ) {
       out.push(
         finding({
-          id: idFor('host-prefix', name),
+          id: idFor('host-prefix', name, salt),
           title: `Cookie "${name}" breaks the __Host- prefix rules`,
           titleAr: `ملف الارتباط "${name}" يخالف قواعد بادئة __Host-`,
           severity: 'medium',
@@ -131,7 +132,7 @@ export const analyseCookies = (http) => {
     if (name.startsWith('__Secure-') && !secure) {
       out.push(
         finding({
-          id: idFor('secure-prefix', name),
+          id: idFor('secure-prefix', name, salt),
           title: `Cookie "${name}" uses the __Secure- prefix without Secure`,
           titleAr: `ملف الارتباط "${name}" يستخدم بادئة __Secure- بدون Secure`,
           severity: 'medium',

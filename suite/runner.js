@@ -5,6 +5,14 @@ import { analyseDns } from './checks/dns-hygiene.js';
 import { analyseEmail } from './checks/email.js';
 import { classifyExposure, findingsFromExposure } from './checks/exposed-files.js';
 import { analysePorts } from './checks/ports.js';
+import {
+  analyseInnerPages,
+  analyseMixedContent,
+  analyseRobots,
+  analyseSecurityTxt,
+  analyseWaf,
+} from './checks/publish.js';
+import { sectorFindings } from './checks/sectors.js';
 import { analyseSubdomains } from './checks/subdomains.js';
 import { analyseTech } from './checks/tech-cve.js';
 import { analyseHeaders, analyseTls } from './checks/tls-headers.js';
@@ -13,6 +21,7 @@ import { buildDenylist } from './denylist.js';
 import { diffReports } from './diff.js';
 import { findingsFromNuclei, runNuclei } from './engines/nuclei.js';
 import { SUITE_VERSION, dedupe, finding, sortFindings } from './findings.js';
+import { DESC_SOURCE, PDPL_SOURCE, UAE_IA_SOURCE } from './uae-map.js';
 import { registrableDomain } from './domain.js';
 import { tokenHint, verifyOwnership } from './ownership.js';
 import { prioritise, scoreFindings, summarise } from './score.js';
@@ -288,6 +297,12 @@ export const runScan = async (options = {}) => {
       ...analysePorts(observations.openPorts, 'active'),
       ...classifyRows(observations.exposed),
       ...findingsFromNuclei(observations.nuclei),
+      ...analyseRobots(observations.robotsTxt),
+      ...analyseSecurityTxt(observations.securityTxt),
+      ...analyseWaf(observations.http?.headers),
+      ...analyseMixedContent(observations.pages),
+      ...analyseInnerPages(observations.pages),
+      ...sectorFindings(observations),
     ]),
   );
 
@@ -329,8 +344,27 @@ export const runScan = async (options = {}) => {
       nmap: false,
     },
     mappingDisclaimer: {
-      en: 'UAE IA and PDPL text on each finding is a reference theme for a human reviewer. It is not a certification, not a NESA or DESC assessment, and not legal advice.',
-      ar: 'نص معيار ضمان المعلومات ونظام حماية البيانات عند كل نتيجة موضوع استرشادي لمراجع بشري. ليس شهادة، ولا تقييمًا لـ NESA أو DESC، ولا استشارة قانونية.',
+      en: 'UAE IA control ids are from Regulation v1.1 (TDRA). They are reference-only: v2.1 may renumber families, and this is not a certification, not a DESC assessment, and not legal advice. PDPL notes are the same kind of reference.',
+      ar: 'أرقام ضوابط معيار ضمان المعلومات من الإصدار 1.1. هي للاسترشاد فقط: الإصدار 2.1 قد يعيد ترقيم العائلات، وهذا ليس شهادة ولا تقييم DESC ولا استشارة قانونية. ملاحظات نظام حماية البيانات من النوع نفسه.',
+    },
+    commercial: {
+      currency: 'AED',
+      market: 'AE',
+      vat: 'exclusive',
+    },
+    language: {
+      en: 'ready',
+      ar: 'needs-native-review',
+    },
+    sources: {
+      uaeIa: UAE_IA_SOURCE,
+      desc: DESC_SOURCE,
+      pdpl: PDPL_SOURCE,
+    },
+    release: {
+      status: 'draft',
+      ready: false,
+      reason: 'Critical and high findings need a reviewer decision before this report is released.',
     },
   };
   if (options.previousReport) report.changes = diffReports(options.previousReport, report);

@@ -39,6 +39,16 @@ export const REFS = {
     'UAE Information Assurance Standard',
     'https://csc.gov.ae/en/w/uae-information-assurance-standard',
   ),
+  uaeIaV11: ref(
+    'UAE IA Regulation v1.1 (TDRA)',
+    'https://tdra.gov.ae/-/media/About/regulations-and-ruling/EN/UAE-Information-Assurance-Regulation-v1-1-pdf.ashx',
+  ),
+  desc: ref('DESC regulations', 'https://www.desc.gov.ae/regulations/licenses/'),
+  kev: ref(
+    'CISA Known Exploited Vulnerabilities',
+    'https://www.cisa.gov/known-exploited-vulnerabilities-catalog',
+  ),
+  epss: ref('FIRST EPSS', 'https://www.first.org/epss/'),
   pdpl: ref(
     'PDPL, Federal Decree-Law 45/2021',
     'https://www.uaelegislation.gov.ae/en/legislations/1972',

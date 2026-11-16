@@ -34,11 +34,18 @@ export const scoreFindings = (findings) => {
   };
 };
 
+const IMPACT_RANK = { high: 3, medium: 2, low: 1 };
+const EFFORT_RANK = { low: 1, medium: 2, high: 3 };
+
 export const prioritise = (findings, limit = 8) => {
   const rank = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+  const leverage = (item) => (IMPACT_RANK[item.impact] || 1) * 10 - (EFFORT_RANK[item.effort] || 2);
   const open = findings
     .filter((item) => item.status === 'open' && item.severity !== 'info')
-    .sort((a, b) => rank[b.severity] - rank[a.severity] || (a.id < b.id ? -1 : 1));
+    .sort(
+      (a, b) =>
+        leverage(b) - leverage(a) || rank[b.severity] - rank[a.severity] || (a.id < b.id ? -1 : 1),
+    );
   const seen = new Set();
   const out = [];
   for (const item of open) {
@@ -49,8 +56,10 @@ export const prioritise = (findings, limit = 8) => {
       severity: item.severity,
       title: item.title,
       titleAr: item.titleAr,
-      remediation: item.remediation,
+      remediation: item.plainFix || item.remediation,
       remediationAr: item.remediationAr,
+      effort: item.effort,
+      impact: item.impact,
     });
     if (out.length >= limit) break;
   }

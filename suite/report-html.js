@@ -21,6 +21,7 @@ const findingBlock = (item) => `
     <span class="sev">${escapeHtml(item.severity)}</span>
     <span class="status">${item.status === 'pass' ? 'pass' : 'open'}</span>
     ${item.needsHumanReview ? '<span class="review">human review</span>' : ''}
+    <span class="sev">impact ${escapeHtml(item.impact || '')} / effort ${escapeHtml(item.effort || '')}</span>
   </header>
   <div class="pair">
     <div>
@@ -34,7 +35,7 @@ const findingBlock = (item) => `
       <p class="theme">${escapeHtml(item.mapping?.uaeIaAr || '')}</p>
     </div>
   </div>
-  <p class="theme">${escapeHtml(item.mapping?.uaeIa || '')} ${escapeHtml(item.mapping?.pdpl || '')}</p>
+  <p class="theme">${escapeHtml(item.mapping?.uaeIaControl || '')} ${escapeHtml(item.mapping?.uaeIaControlName || '')}. ${escapeHtml(item.mapping?.descIsr || '')}</p>
   <ul class="refs">
     ${(item.references || [])
       .map((ref) => `<li><a href="${escapeHtml(ref.url)}">${escapeHtml(ref.title)}</a></li>`)
@@ -111,7 +112,8 @@ export const renderHtml = (report) => {
     <p class="brand">Cormorant Cyber</p>
     <h1>UAE Readiness Scan</h1>
     <p class="ar" lang="ar" dir="rtl">فحص الجاهزية للإمارات</p>
-    <p>${escapeHtml(report.target?.hostname || '')} · ${escapeHtml(report.mode)} · ${escapeHtml(report.source)} · ${escapeHtml(report.generatedAt || '')}</p>
+    <p>${escapeHtml(report.target?.hostname || '')} · ${escapeHtml(report.mode)} · ${escapeHtml(report.source)} · ${escapeHtml(report.generatedAt || '')} · ${escapeHtml(report.commercial?.currency || 'AED')}</p>
+    <p class="box">Draft status: ${escapeHtml(report.release?.status || 'draft')}. Arabic wording needs a native reviewer before this report is sent to a customer. النص العربي مسودة ويحتاج مراجعة لغوية قبل إرساله.</p>
   </header>
   <section class="box pair">
     <div>
@@ -145,6 +147,51 @@ export const renderHtml = (report) => {
     <p>${escapeHtml(report.score?.model || '')}</p>
     <p>Authorised: ${report.legal?.authorized ? 'yes' : 'no'}. Ownership: ${escapeHtml(report.legal?.ownership?.method || report.legal?.ownership?.reason || 'n/a')}. Active checks ran: ${report.legal?.activeRan ? 'yes' : 'no'}.</p>
   </section>
+</main>
+</body>
+</html>`;
+};
+
+export const renderExecutiveHtml = (report) => {
+  const fixes = (report.prioritisedFixes || [])
+    .slice(0, 5)
+    .map(
+      (item) =>
+        `<li><div class="pair"><div><strong>${escapeHtml(item.title)}</strong> <em>impact ${escapeHtml(item.impact)} / effort ${escapeHtml(item.effort)}</em><p>${escapeHtml(item.remediation)}</p></div><div class="ar" lang="ar" dir="rtl"><strong>${escapeHtml(item.titleAr)}</strong><p>${escapeHtml(item.remediationAr)}</p></div></div></li>`,
+    )
+    .join('');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Executive brief — ${escapeHtml(report.target?.hostname || '')}</title>
+  <style>
+    body { margin:0; font:15px/1.45 "Segoe UI", Tahoma, sans-serif; color:#1c2430; }
+    main { max-width:900px; margin:0 auto; padding:1.2rem; }
+    .pair { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    .ar { direction:rtl; font-family:Tahoma, sans-serif; }
+    h1 { font-family:Georgia, serif; font-weight:500; margin:0; }
+    .banner { background:#fff4d6; border:1px solid #e0c36a; padding:.6rem .8rem; }
+    ol { padding-left:1.1rem; }
+    @media (max-width:800px) { .pair { grid-template-columns:1fr; } }
+    @media print { .banner, li { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <p>Cormorant Cyber · UAE Readiness Scan · ${escapeHtml(report.commercial?.currency || 'AED')} · ${escapeHtml(report.release?.status || 'draft')}</p>
+  <div class="pair">
+    <h1>${escapeHtml(report.target?.hostname || '')}: ${escapeHtml(report.score?.value ?? '—')}</h1>
+    <h1 class="ar" lang="ar" dir="rtl">${escapeHtml(report.score?.bandAr || '')}</h1>
+  </div>
+  <p class="banner">Arabic wording needs a native reviewer before delivery. النص العربي يحتاج مراجعة لغوية من متحدث أصلي قبل التسليم.</p>
+  <div class="pair">
+    <p>${escapeHtml(report.summary?.en || '')}</p>
+    <p class="ar" lang="ar" dir="rtl">${escapeHtml(report.summary?.ar || '')}</p>
+  </div>
+  <h2>Fixes, highest leverage first <span class="ar" lang="ar" dir="rtl">الإصلاحات الأعلى أثرًا مقابل الجهد</span></h2>
+  <ol>${fixes}</ol>
+  <p>${escapeHtml(report.mappingDisclaimer?.en || '')}</p>
 </main>
 </body>
 </html>`;

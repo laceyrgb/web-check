@@ -1,0 +1,46 @@
+{
+  "schema": "cormorant-intel-v1",
+  "note": "Small offline cache shaped like a normalised NVD + CISA KEV + EPSS extract. It is not the full NVD. Refresh with node suite/cli.js refresh-intel, which is a separate operator command and is not part of a customer scan.",
+  "items": [
+    {
+      "cve": "CVE-2021-41773",
+      "findingId": "tech.apache.path-traversal",
+      "product": "apache",
+      "versions": ["2.4.49", "2.4.50"],
+      "severity": "high",
+      "kev": true,
+      "epss": 0.94,
+      "title": "Apache HTTP Server 2.4.49 and 2.4.50 have a known path-traversal bug",
+      "titleAr": "خادم أباتشي 2.4.49 و2.4.50 فيه ثغرة اجتياز مسار معروفة",
+      "remediation": "Upgrade Apache HTTP Server past 2.4.50 and confirm the running build, not only the banner. This row is a version match, not a proof the attack works.",
+      "remediationAr": "رقِّ خادم أباتشي إلى ما بعد 2.4.50 وتأكد من البناء الذي يعمل، لا من اللافتة فقط. هذا تطابق إصدار وليس إثباتًا أن الهجوم ينجح."
+    },
+    {
+      "cve": "CVE-2014-0160",
+      "findingId": "tech.openssl.heartbleed",
+      "product": "openssl",
+      "versions": ["1.0.1", "1.0.1a", "1.0.1b", "1.0.1c", "1.0.1d", "1.0.1e", "1.0.1f"],
+      "severity": "high",
+      "kev": true,
+      "epss": 0.97,
+      "title": "OpenSSL in the Heartbleed range",
+      "titleAr": "إصدار OpenSSL ضمن مدى ثغرة Heartbleed",
+      "remediation": "Upgrade OpenSSL to a supported release and replace the private key and certificate. No heartbeat payload was sent.",
+      "remediationAr": "رقِّ OpenSSL إلى إصدار مدعوم واستبدل المفتاح الخاص والشهادة. لم يُرسل طلب heartbeat."
+    },
+    {
+      "cve": "CVE-2020-11022",
+      "findingId": "tech.jquery.html",
+      "product": "jquery",
+      "below": "3.5.0",
+      "atLeast": "1.2.0",
+      "severity": "medium",
+      "kev": false,
+      "epss": 0.04,
+      "title": "jQuery is older than 3.5.0",
+      "titleAr": "jQuery أقدم من 3.5.0",
+      "remediation": "Upgrade jQuery to 3.5.0 or later. A reviewer should confirm whether untrusted HTML reaches jQuery. No exploit was sent.",
+      "remediationAr": "رقِّ jQuery إلى 3.5.0 أو أحدث. على المراجع أن يتأكد إن كان HTML غير موثوق يصل إلى jQuery. لم يُرسل استغلال."
+    }
+  ]
+}
