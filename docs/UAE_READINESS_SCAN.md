@@ -87,25 +87,29 @@ Canonical source: `node suite/cli.js inventory`, which prints `suite/inventory.j
 | robots.txt, security.txt, WAF | Passive checks on the homepage fetch |
 | UAE IA v1.1 control ids | Cited from the TDRA regulation and labelled reference-only. DESC ISR is named without invented clause numbers |
 | AED report metadata and sector packs | Currency AED. Packs for Microsoft 365, Google Workspace, WooCommerce, Shopify, and common UAE shared hosting |
-| Executive brief | One-page HTML (EN/AR, RTL) and a one-page English PDF. Arabic is marked as needing native review. Fixes ranked by impact versus effort |
+| Executive brief | One-page HTML (EN/AR, RTL) and a one-page PDF with Noto Naskh Arabic (OFL), shaped and right-to-left. Arabic is still marked as needing native review. Fixes ranked by impact versus effort |
+| Run history | JSON store of each scan: score over time, and which open finding ids appeared or cleared |
+| Delivery outbox | Email and WhatsApp adapters render a bilingual note into a folder. Dry-run only. No credentials and no send |
+| Order record | Ties order, customer, target, ownership proof, authorisation, reviewer sign-off, and release. Payment status is a placeholder. Release is blocked until proof, authorisation, and sign-off are present |
+| Breach and NVD stubs | Provider interfaces backed by fixtures. PDPL minimisation keeps the default report to domain counts and data classes |
+| UAE IA v2.1 crosswalk template | v1.1 id to a blank v2.1 id. Reference-only. A blank is not a mapping |
 
 ### Still missing
 
 | # | Gap | Why it is still open |
 | --- | --- | --- |
-| 1 | Licensed breach data | Domain-level exposure with PDPL minimisation. The legacy HIBP list is not in this report |
-| 2 | Full NVD in git | The matcher and the feed normaliser exist. The committed cache is a small extract, not the whole database |
+| 1 | Licensed breach data | A fixture provider returns domain counts only. Licensed breach data is not connected |
+| 2 | Full NVD download | A fixture provider can ingest an NVD-shaped payload. The committed cache is still a small extract, and refresh-intel is the only live fetch |
 | 3 | Authenticated DAST | OWASP ZAP (Apache-2.0) is still not invoked. An active scan stays out of policy for this phase |
-| 4 | Alert delivery | Monitoring emits JSON events. Email, SMS, and WhatsApp delivery are not built |
-| 5 | UAE IA v2.1 crosswalk | Ids are from TDRA v1.1. A reviewer must confirm them against v2.1 before they are cited as current |
+| 4 | Live email and WhatsApp | The adapters write an outbox. They do not send, and they accept no credentials |
+| 5 | Filled UAE IA v2.1 crosswalk | The template lists v1.1 ids and leaves v2.1 blank. A human has to verify every row |
 | 6 | DESC ISR clause numbers | The report names the regulation and does not invent clause numbers |
-| 7 | Native Arabic edit | Arabic is marked needs-native-review. It is not a delivered translation |
-| 8 | Arabic inside the PDF | The one-page PDF is English because standard PDF fonts have no Arabic glyphs. Arabic is in the HTML brief |
-| 9 | Confirmed takeover | Dangling CNAMEs are leads. The suite does not claim a takeover |
-| 10 | Zone transfer | AXFR is intentionally not implemented |
-| 11 | Cloud bucket names | Guessing storage hostnames is not implemented |
-| 12 | Customer order log | The reviewer audit log exists. Who ordered the scan, payment, and source address are not stored |
-| 13 | nmap | Not used. Its licence is the wrong fit for shipping inside this product |
+| 7 | Native Arabic edit | The PDF shapes Arabic with Noto Naskh. The wording is still marked needs-native-review |
+| 8 | Confirmed takeover | Dangling CNAMEs are leads. The suite does not claim a takeover |
+| 9 | Zone transfer | AXFR is intentionally not implemented |
+| 10 | Cloud bucket names | Guessing storage hostnames is not implemented |
+| 11 | Payment integration | The order record has a payment status field fixed at not-integrated. No provider is called |
+| 12 | nmap | Not used. Its licence is the wrong fit for shipping inside this product |
 <!-- inventory:end -->
 
 ## How to run it
@@ -166,7 +170,17 @@ Nuclei (MIT, not bundled) runs only on an authorised active scan, and only the p
 node suite/cli.js scan --target customer.example --live --mode active --authorized --verify-token '<token>' --nuclei /usr/bin/nuclei --out /tmp/readiness
 ```
 
-Monitoring re-checks ownership every run, then diffs the report. Alerts are JSON events (`finding.opened`, `finding.resolved`, `score.changed`). A government name is refused before that check. Pass `--live` and a subscription file. This does not send email.
+Monitoring re-checks ownership every run, then diffs the report. Alerts are JSON events (`finding.opened`, `finding.resolved`, `score.changed`). A government name is refused before that check. Pass `--live` and a subscription file. `--out` also writes a JSON history under `history/runs.json`, and the HTML report lists the score over those runs.
+
+Email and WhatsApp delivery are dry-run adapters. They write a bilingual message into an outbox directory. `--send` is refused. The adapters take no credentials.
+
+```bash
+node suite/cli.js scan --target scan.example --observations suite/fixtures/example-observations.json --out /tmp/readiness --outbox /tmp/readiness-outbox
+```
+
+The one-page PDF embeds Noto Naskh Arabic (SIL OFL 1.1, see `suite/fonts/OFL.txt`). Arabic is shaped and drawn right to left. The page still says the wording needs a native reviewer.
+
+An order record ties the order id, customer, target, ownership proof, authorisation, and reviewer sign-off. Payment status stays `not-integrated`. Release is blocked until proof, authorisation, and sign-off are all present. Breach and NVD access are fixture providers: the default breach result is a domain count and data classes, and personal rows are dropped. `suite/uae/v21-crosswalk.json` lists the v1.1 ids and leaves every v2.1 cell blank.
 
 Version matching uses a cached NVD + CISA KEV + EPSS extract. KEV and high EPSS raise the priority. The match is the banner only. `node suite/cli.js refresh-intel --fetch` is a separate operator command that contacts NVD, CISA, and FIRST. It is not part of a customer scan. The file in git is a small extract, not the whole NVD.
 
@@ -180,8 +194,8 @@ Library entry point: `import { runScan, applyReview, runMonitor } from './suite/
 
 The gap table above is the inventory. [SUITE_ROADMAP.md](./SUITE_ROADMAP.md) has the reasoning. Highest-leverage items still open:
 
-1. A native Arabic edit, then Arabic glyphs in the one-page PDF.
-2. A human crosswalk from these v1.1 ids to UAE IA v2.1, still labelled reference-only.
-3. Deliver the monitoring JSON events by email or WhatsApp, and store each run.
-4. Licensed breach data at domain level, with personal rows kept out of the default report.
-5. An AED checkout in front of this scanner, with the order, the proof, and the reviewer stored together.
+1. A native editor reviews the Arabic strings now that the PDF can show them.
+2. A human fills the blank v2.1 cells in `suite/uae/v21-crosswalk.json` from the official text.
+3. A real email and WhatsApp sender behind the outbox interface, still with no secrets in the repository.
+4. A licensed breach provider that returns only the minimised domain record the stub already defines.
+5. A payment status that a real AED provider can set, without weakening the rule that release needs proof, authorisation, and sign-off.

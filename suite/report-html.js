@@ -71,6 +71,16 @@ export const renderHtml = (report) => {
         `<li><div class="pair"><div>${escapeHtml(item.en)}</div><div class="ar" lang="ar" dir="rtl">${escapeHtml(item.ar)}</div></div></li>`,
     )
     .join('');
+  const trend = report.trend?.points?.length
+    ? `<section class="box"><h2>Score over stored runs <span class="ar" lang="ar" dir="rtl">النتيجة عبر التشغيلات المحفوظة</span></h2><ol>${report.trend.points
+        .map(
+          (point) =>
+            `<li>${escapeHtml(point.at)} · ${escapeHtml(point.score ?? 'n/a')} · open ${escapeHtml(point.open)}</li>`,
+        )
+        .join(
+          '',
+        )}</ol><p>New since the previous stored run: ${escapeHtml((report.trend.opened || []).join(', ') || 'none')}. Resolved: ${escapeHtml((report.trend.resolved || []).join(', ') || 'none')}.</p></section>`
+    : '';
   const changes = report.changes
     ? `<section><h2>Changes since the previous report <span class="ar" lang="ar" dir="rtl">التغير منذ التقرير السابق</span></h2>
        <p>${report.changes.added.length} added, ${report.changes.removed.length} gone, score delta ${report.changes.scoreDelta ?? 'n/a'}.</p></section>`
@@ -132,6 +142,7 @@ export const renderHtml = (report) => {
     ${fixes ? `<ol>${fixes}</ol>` : '<p>No prioritised fixes.</p>'}
   </section>
   ${groups}
+  ${trend}
   <section>
     <h2>What this scan did not do <span class="ar" lang="ar" dir="rtl">ما لم يفعله هذا الفحص</span></h2>
     <ul>${scope}</ul>

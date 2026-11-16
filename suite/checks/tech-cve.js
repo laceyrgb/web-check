@@ -59,16 +59,16 @@ const fromHeader = (headers, body) => {
   return found;
 };
 
-export const analyseTech = (observations) => {
+export const analyseTech = (observations, items) => {
   const headers = observations.http?.headers || {};
   const body = observations.http?.bodySnippet || '';
   const out = [];
   for (const [product, version, source] of fromHeader(headers, body)) {
-    out.push(...matchProduct(product, version, source));
+    out.push(...matchProduct(product, version, source, items));
   }
   for (const row of observations.passivePorts || []) {
     if (!row?.product || !row?.version) continue;
-    out.push(...matchProduct(row.product, row.version, `passive port ${row.port}`));
+    out.push(...matchProduct(row.product, row.version, `passive port ${row.port}`, items));
   }
   return out.map((item) => ({ ...item, evidence: clip(item.evidence, 400) }));
 };

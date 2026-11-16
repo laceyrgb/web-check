@@ -310,8 +310,9 @@ test('the same-site crawl stays on the origin and mixed content is reported', as
   assert.match(html, /dir="rtl"/);
   assert.match(html, /native reviewer/);
   const pdf = renderExecutivePdf(report);
-  assert.match(pdf, /^%PDF-1.4/);
-  assert.match(pdf, /impact/);
+  const pdfText = Buffer.isBuffer(pdf) ? pdf.toString('latin1') : pdf;
+  assert.match(pdfText, /^%PDF-1.4/);
+  assert.match(pdfText, /impact/);
   const ranked = prioritise([
     {
       id: 'a',

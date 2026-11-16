@@ -13,6 +13,8 @@ import {
   analyseWaf,
 } from './checks/publish.js';
 import { sectorFindings } from './checks/sectors.js';
+import { breachFindings } from './providers/breach.js';
+import { runRecord } from './store.js';
 import { analyseSubdomains } from './checks/subdomains.js';
 import { analyseTech } from './checks/tech-cve.js';
 import { analyseHeaders, analyseTls } from './checks/tls-headers.js';
@@ -283,6 +285,15 @@ export const runScan = async (options = {}) => {
     });
   }
 
+  let intelItems;
+  if (options.nvdProvider) {
+    const ingested = await options.nvdProvider.ingest();
+    intelItems = ingested.items;
+  }
+  const breachRows = options.breachProvider
+    ? await options.breachProvider.lookup(registrableDomain(target.hostname))
+    : [];
+
   const findings = dedupe(
     sortFindings([
       ...analyseEmail(target.hostname, observations.dns),
@@ -292,7 +303,8 @@ export const runScan = async (options = {}) => {
       ...analyseCookies(observations.http),
       ...analyseCors({ headers: observations.http?.headers, probe: observations.corsProbe }),
       ...analyseSubdomains(target.hostname, observations.ctNames),
-      ...analyseTech(observations),
+      ...analyseTech(observations, intelItems),
+      ...breachFindings(breachRows),
       ...analysePorts(observations.passivePorts, 'passive'),
       ...analysePorts(observations.openPorts, 'active'),
       ...classifyRows(observations.exposed),
@@ -368,5 +380,9 @@ export const runScan = async (options = {}) => {
     },
   };
   if (options.previousReport) report.changes = diffReports(options.previousReport, report);
+  if (options.store) {
+    options.store.saveRun(runRecord(report));
+    report.trend = options.store.trend(target.hostname);
+  }
   return report;
 };

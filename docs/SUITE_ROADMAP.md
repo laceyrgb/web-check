@@ -1,42 +1,38 @@
 # Suite roadmap
 
-Version 0.2 of the UAE Readiness Scan. The safety gates from 0.1 are unchanged: passive by default, active work only with ownership verification and `--authorized`, the government and critical-infrastructure denylist, no exploitation, no brute force, no credential testing, and tests on fixtures or localhost.
+Version 0.3 of the UAE Readiness Scan. The safety gates are unchanged: passive by default, active work only with ownership verification and `--authorized`, the government and critical-infrastructure denylist, no exploitation, no brute force, no credential testing, and tests on fixtures or localhost.
 
 ## Shipped in this round
 
-1. **Sign-off queue.** Open critical and high findings must be approved, edited, or suppressed, with a reason on edit and suppress, before `release.status` becomes `released`. The audit log records reviewer, time, action, and reason.
-2. **Monitoring.** `runMonitor` re-checks ownership on every run, refuses a denylisted name before that check, and emits JSON events for a baseline, new findings, resolved findings, and score changes. It does not send mail.
-3. **CVE cache.** Banner and version matching reads a normalised NVD + CISA KEV + EPSS cache. KEV forces priority `immediate` and severity critical. EPSS at or above 0.1 raises severity one step. `refresh-intel --fetch` is an operator command with an allow-list of the three feed hosts. The committed cache is a small extract.
-4. **Pinned nuclei templates.** Three GET-only templates (security.txt, robots.txt, missing HSTS), hashed in `pin.json`. The adapter refuses to launch if the pin or a forbidden marker fails. Exploit tags and interactsh stay excluded.
-5. **Same-site crawl on the active path.** Up to five pages, same host, same non-page scheme rules as the page-link crawl. Mixed content and inner-page cookies are findings. `robots.txt`, `security.txt`, and a short WAF fingerprint list run with the homepage.
-6. **UAE references.** Each finding carries a UAE IA Regulation v1.1 control id taken from the TDRA PDF (T4.2.4, T7.4.1, T7.7.1, T1.2.1, T4.5.2, M5.2.1, and the family that matches the service). The label says reference-only and points at the PDF. DESC ISR is named and linked, without invented clause numbers. PDPL notes stay reference-only. Report metadata is AED, market AE, VAT exclusive.
-7. **Sector packs.** Microsoft 365, Google Workspace, WooCommerce, Shopify, and a shared-hosting hint used by many UAE sites. The text is a fix hint, not a claim about the vendor contract.
-8. **Brief.** `executive.html` is one page, English and Arabic, RTL, and says the Arabic needs a native reviewer. `executive.pdf` is one English page. Fixes are ordered by impact against effort.
+1. **Arabic in the one-page PDF.** Noto Naskh Arabic (SIL Open Font License 1.1, copyright Google) is bundled with `suite/fonts/OFL.txt`. Arabic is shaped into presentation forms, including lam-alef, and drawn right to left. The line that the wording needs a native reviewer stays on the page.
+2. **Run storage.** A JSON store records each scan's score and open finding ids. The report lists the score over those runs and which ids appeared or cleared.
+3. **Delivery adapters.** Email and WhatsApp are pluggable channels. The only implementation writes a bilingual message into an outbox folder. It stores no credentials and refuses a live send.
+4. **Order record.** One record holds the order id, customer, target, ownership proof, authorisation, reviewer sign-off, and report release. Payment status is fixed at `not-integrated`. Release is blocked until proof, authorisation, and sign-off are all present.
+5. **Breach and NVD stubs.** Both are provider interfaces fed by fixtures. Breach results in the default report are domain counts and data classes. Personal rows are dropped. Neither provider has an API key.
+6. **UAE IA v2.1 crosswalk template.** `suite/uae/v21-crosswalk.json` lists the v1.1 ids this suite cites and leaves every v2.1 cell blank. A blank is not a mapping. The file is labelled reference-only and needs human review.
 
 ## Still missing
 
-- Licensed breach data, with personal rows kept out of the default report.
-- The full NVD in the repository. The normaliser is here. The cache in git is small.
-- OWASP ZAP, including a baseline scan. Still out of policy until there is a signed scope.
-- Delivery of monitoring events (email, SMS, WhatsApp) and a stored history beyond the previous file the caller passes in.
-- A reviewer-confirmed crosswalk from v1.1 control ids to UAE IA v2.1.
-- DESC ISR clause numbers. They are not guessed.
-- A native Arabic edit, and Arabic text inside the PDF.
-- Confirmed subdomain takeover. Dangling CNAMEs stay leads.
-- AXFR, cloud bucket names, and nmap.
-- The customer order log: who paid, the proof, and the source address. The reviewer log is a different record.
+- A licensed breach feed. The stub and the PDPL minimisation rule are in place.
+- A full NVD download. The fixture ingester and the small committed cache are in place. `refresh-intel --fetch` remains the only live fetch, and it is an operator command.
+- A filled v2.1 crosswalk. A person has to read the current standard and complete the blank cells.
+- A native edit of the Arabic wording. The glyphs now render.
+- Live email or WhatsApp. The outbox is the only delivery.
+- A payment provider. The order field does not call one.
+- OWASP ZAP, confirmed takeover, AXFR, cloud bucket names, nmap, and DESC ISR clause numbers.
 
-## Next five, for the UAE offer
+## Next five
 
-1. **Native Arabic, then the PDF.** The bilingual HTML is what a customer would forward. It is still a draft. A native editor should lock the glossary, and the PDF should use a font that can carry that Arabic.
-2. **v2.1 crosswalk.** Keep the reference-only label. Replace v1.1 ids only where the current standard moved them, and cite the page.
-3. **Send the monitoring events.** JSON events are enough for an operator. A UAE SMB buyer needs a short Arabic and English note when a high finding appears or disappears, on a schedule, with ownership re-checked as it is now.
-4. **Breach data with a PDPL rule.** Domain and date and data classes. No personal email addresses in the default export.
-5. **AED checkout in front of the scanner.** The report already says the currency is AED. The missing product is the order, the stored proof, and the reviewer on the same record, so a released report can be tied to a paid engagement.
+1. A native editor reviews the Arabic strings now that the PDF can show them.
+2. A human fills the v2.1 crosswalk from the official text and leaves the reference-only label in place.
+3. A real email and WhatsApp sender behind the same outbox interface, still without putting secrets in the repository.
+4. A licensed breach provider that returns only the minimised domain record this stub already defines.
+5. A payment status that a real AED provider can set on the order record, without changing the rule that release needs proof, authorisation, and sign-off.
 
 ## Explicitly out of the next slice
 
 - Brute force, credential testing, and exploit payloads.
 - nmap.
-- Selling this scan to a `*.gov.ae` name or other denylisted infrastructure.
-- Treating the control ids as a certificate.
+- Scanning a denylisted name.
+- Treating control ids as a certificate.
+- Inventing v2.1 mappings to fill the blank cells.

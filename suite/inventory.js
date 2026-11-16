@@ -245,43 +245,62 @@ export const addedChecks = [
   ],
   [
     'Executive brief',
-    'One-page HTML (EN/AR, RTL) and a one-page English PDF. Arabic is marked as needing native review. Fixes ranked by impact versus effort',
+    'One-page HTML (EN/AR, RTL) and a one-page PDF with Noto Naskh Arabic (OFL), shaped and right-to-left. Arabic is still marked as needing native review. Fixes ranked by impact versus effort',
+  ],
+  [
+    'Run history',
+    'JSON store of each scan: score over time, and which open finding ids appeared or cleared',
+  ],
+  [
+    'Delivery outbox',
+    'Email and WhatsApp adapters render a bilingual note into a folder. Dry-run only. No credentials and no send',
+  ],
+  [
+    'Order record',
+    'Ties order, customer, target, ownership proof, authorisation, reviewer sign-off, and release. Payment status is a placeholder. Release is blocked until proof, authorisation, and sign-off are present',
+  ],
+  [
+    'Breach and NVD stubs',
+    'Provider interfaces backed by fixtures. PDPL minimisation keeps the default report to domain counts and data classes',
+  ],
+  [
+    'UAE IA v2.1 crosswalk template',
+    'v1.1 id to a blank v2.1 id. Reference-only. A blank is not a mapping',
   ],
 ];
 
 export const missingChecks = [
   [
     'Licensed breach data',
-    'Domain-level exposure with PDPL minimisation. The legacy HIBP list is not in this report',
+    'A fixture provider returns domain counts only. Licensed breach data is not connected',
   ],
   [
-    'Full NVD in git',
-    'The matcher and the feed normaliser exist. The committed cache is a small extract, not the whole database',
+    'Full NVD download',
+    'A fixture provider can ingest an NVD-shaped payload. The committed cache is still a small extract, and refresh-intel is the only live fetch',
   ],
   [
     'Authenticated DAST',
     'OWASP ZAP (Apache-2.0) is still not invoked. An active scan stays out of policy for this phase',
   ],
   [
-    'Alert delivery',
-    'Monitoring emits JSON events. Email, SMS, and WhatsApp delivery are not built',
+    'Live email and WhatsApp',
+    'The adapters write an outbox. They do not send, and they accept no credentials',
   ],
   [
-    'UAE IA v2.1 crosswalk',
-    'Ids are from TDRA v1.1. A reviewer must confirm them against v2.1 before they are cited as current',
+    'Filled UAE IA v2.1 crosswalk',
+    'The template lists v1.1 ids and leaves v2.1 blank. A human has to verify every row',
   ],
   ['DESC ISR clause numbers', 'The report names the regulation and does not invent clause numbers'],
-  ['Native Arabic edit', 'Arabic is marked needs-native-review. It is not a delivered translation'],
   [
-    'Arabic inside the PDF',
-    'The one-page PDF is English because standard PDF fonts have no Arabic glyphs. Arabic is in the HTML brief',
+    'Native Arabic edit',
+    'The PDF shapes Arabic with Noto Naskh. The wording is still marked needs-native-review',
   ],
   ['Confirmed takeover', 'Dangling CNAMEs are leads. The suite does not claim a takeover'],
   ['Zone transfer', 'AXFR is intentionally not implemented'],
   ['Cloud bucket names', 'Guessing storage hostnames is not implemented'],
   [
-    'Customer order log',
-    'The reviewer audit log exists. Who ordered the scan, payment, and source address are not stored',
+    'Payment integration',
+    'The order record has a payment status field fixed at not-integrated. No provider is called',
   ],
   ['nmap', 'Not used. Its licence is the wrong fit for shipping inside this product'],
 ];

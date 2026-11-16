@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { REFS } from './refs.js';
 import { DESC_NOTE, DESC_NOTE_AR, UAE_IA_SOURCE, controlFor } from './uae-map.js';
 
-export const SUITE_VERSION = '0.2.0';
+export const SUITE_VERSION = '0.3.0';
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
 

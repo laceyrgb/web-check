@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { deliverMonitoring, createOutbox, refuseLiveSend } from './delivery.js';
 import { gapMarkdown } from './inventory.js';
 import { fetchIntel, httpsGetJson } from './intel/intel.js';
 import { createLiveTransports } from './live.js';
@@ -12,6 +13,7 @@ import { renderExecutivePdf } from './pdf.js';
 import { renderExecutiveHtml, renderHtml, renderJson } from './report-html.js';
 import { applyReview } from './review.js';
 import { runScan } from './runner.js';
+import { openStore } from './store.js';
 import { parseTarget } from './target.js';
 
 export const parseArgs = (argv) => {
@@ -69,6 +71,8 @@ export const scanFromArgs = async (args) => {
   let previousReport;
   if (args.previous) previousReport = JSON.parse(await readFile(args.previous, 'utf8'));
   const transports = live ? createLiveTransports(parseTarget(args.target).hostname) : undefined;
+  const store =
+    args.store || args.out ? openStore(args.store || path.join(args.out, 'history')) : undefined;
   return runScan({
     target: args.target,
     observations: live ? undefined : observations,
@@ -79,12 +83,21 @@ export const scanFromArgs = async (args) => {
     deny: (args.deny || []).filter((entry) => typeof entry === 'string'),
     engines: args.nuclei ? { nuclei: args.nuclei } : {},
     previousReport,
+    store,
   });
 };
 
 export const runCli = async (argv) => {
   const args = parseArgs(argv);
   const command = args._[0];
+  if (asBool(args.send)) {
+    try {
+      refuseLiveSend();
+    } catch (error) {
+      console.error(error.message);
+      return 1;
+    }
+  }
   if (args.help || !command) {
     console.log(usage);
     return command ? 0 : 1;
@@ -125,6 +138,7 @@ export const runCli = async (argv) => {
     const previousReport = args.previous ? JSON.parse(await readFile(args.previous, 'utf8')) : null;
     const target = parseTarget(subscription.target);
     const transports = createLiveTransports(target.hostname);
+    const store = args.store ? openStore(args.store) : undefined;
     const result = await runMonitor({
       subscription,
       previousReport,
@@ -135,8 +149,16 @@ export const runCli = async (argv) => {
           origin: target.origin,
           transports,
         }),
-      scan: (options) => runScan({ ...options, transports }),
+      scan: (options) => runScan({ ...options, transports, store }),
     });
+    if (args.outbox && result.events) {
+      await deliverMonitoring({
+        outbox: createOutbox(args.outbox),
+        hostname: target.hostname,
+        score: result.report?.score?.value ?? null,
+        events: result.events,
+      });
+    }
     if (args.out) {
       await mkdir(args.out, { recursive: true });
       await writeFile(path.join(args.out, 'events.json'), renderJson(result.events));
